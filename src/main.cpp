@@ -80,6 +80,9 @@ int main(int argc, char *argv[]) {
             clientSocket.write("CLOSE_SETTINGS\n");
         } else if (action == "toggle") {
             clientSocket.write("TOGGLE_SETTINGS\n");
+        } else if (parser.isSet(backgroundOpt) || action == "background") {
+            // Already running in background; exit quietly
+            return 0;
         } else {
             // Send show settings to existing instance
             clientSocket.write("SHOW_SETTINGS\n");

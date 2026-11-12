@@ -14,8 +14,8 @@ Window {
     LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
     LayerShell.Window.scope: "thermo-desktop-strip"
 
-    property bool isHovered: mouseArea.containsMouse
-    property bool isDragging: mouseArea.drag.active
+    property bool isHovered: mouseArea.containsMouse || (readoutPill.opacity > 0.1 && pillMouseArea.containsMouse)
+    property bool isDragging: mouseArea.drag.active || pillMouseArea.drag.active
 
     // Resting width is narrow so it never blocks desktop clicks when idle.
     // Expands on hover/drag so the readout pill and interaction zone have full room.
@@ -203,6 +203,46 @@ Window {
                     color: Qt.rgba(theme.accentForeground === "white" ? 1 : 0.8, 0.8, 0.8, 0.5)
                     font.pixelSize: 9
                     anchors.horizontalCenter: parent.horizontalCenter
+                }
+            }
+
+            // Mouse interaction directly on the holographic readout pill
+            MouseArea {
+                id: pillMouseArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: isDragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                visible: readoutPill.opacity > 0.1
+
+                drag.target: railContainer
+                drag.axis: Drag.YAxis
+                drag.minimumY: 28
+                drag.maximumY: Math.max(28, thermoWindow.height - railContainer.height - 20)
+
+                property real startY: 0
+                property bool moved: false
+
+                onPressed: (mouse) => {
+                    startY = pillMouseArea.mouseY
+                    moved = false
+                }
+
+                onPositionChanged: (mouse) => {
+                    if (Math.abs(pillMouseArea.mouseY - startY) > 5) {
+                        moved = true
+                    }
+                }
+
+                onReleased: {
+                    if (moved) {
+                        backend.setRailY(railContainer.y)
+                    }
+                }
+
+                onClicked: {
+                    if (!moved) {
+                        backend.openSettings()
+                    }
                 }
             }
         }
