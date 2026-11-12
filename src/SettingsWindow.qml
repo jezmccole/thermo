@@ -366,11 +366,39 @@ ApplicationWindow {
                             }
                         }
                         Text {
-                            text: qsTr("Adjust minimum (green) and maximum (red) threshold bounds.")
+                            text: qsTr("Adjust minimum (blue) and maximum (red) threshold bounds.")
                             color: "#8b949e"
                             font.pixelSize: 11
                         }
                     }
+                }
+            }
+
+            // Product attribution and project information.
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                Text {
+                    text: qsTr("About Thermo")
+                    color: "#f0f6fc"
+                    font.pixelSize: 14
+                    font.bold: true
+                }
+                Text {
+                    text: qsTr("Created by Kairos Medical Informatics Ltd")
+                    color: "#c9d1d9"
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+                Text {
+                    text: qsTr("Version %1 • MIT licence").arg(Qt.application.version)
+                    color: "#8b949e"
+                    font.pixelSize: 12
+                }
+                Button {
+                    text: qsTr("Project and contributions on GitHub")
+                    onClicked: Qt.openUrlExternally("https://github.com/jezmccole/thermo")
                 }
             }
 

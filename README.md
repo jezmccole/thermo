@@ -1,49 +1,116 @@
 # Thermo
 
-A modern, ambient, always-on desktop edge thermometer for MacBook running Omarchy (Linux / Hyprland).
+A quiet desktop thermometer for Omarchy: glance at the rail, hover for a readable glass badge with temperature and fan speeds.
 
-Sits quietly on the desktop behind all windows along the right edge of your screen, displaying a minimal graphical representation of your MacBook hardware temperatures.
+**Created by Kairos Medical Informatics Ltd.** Open source, with contributions welcome.
 
-## Features
+![Thermo glass badge showing a live temperature and fan speed](docs/thermo-badge.png)
 
-- **Ambient Desktop Placement**: Runs on Wayland `LayerBottom`, living behind all active tiled and floating application windows on your desktop.
-- **Ultra-Minimal Footprint**: Only a few pixels wide when resting, completely unobtrusive and non-distracting.
-- **Organic Heat Gradient**: Cold blue (`#38BDF8`) through a muted neutral midpoint and orange to hot crimson (`#DC2626`), with matching blue outlines.
-- **Interactive Holographic Readout**: Hovering reveals a stationary frosted glass readout badge beside the rail. The rail never moves or expands on hover; a continuous hover area and brief exit delay keep the badge readable. Transparent areas allow desktop clicks through.
-- **Live Fan Speeds**: The smoked glass badge reports each available hardware fan in RPM, refreshed every 1.5 seconds. Missing readings are shown as unavailable.
-- **Draggable Position**: Click and drag the thermometer strip vertically along the edge of your screen to set your preferred resting position.
-- **MacBook Sensor Detection**: Autodetects all Apple SMC hardware sensors (`applesmc`) and CPU package sensors (`coretemp`). Defaults to **Central Processor Proximity (`TC0P`)**, with options for Average CPU temperature, System average, or individual sensors.
-- **Live Omarchy Theming**: Watches desktop accent and Hyprland window rounding live.
-- **Configurable Autostart**: Pre-enabled to launch on login, toggleable inside the settings window.
+## What it does today
 
-The default rail height is 127 pixels, adjustable in Settings.
+- A stationary desktop-edge rail with a blue → neutral → orange → red temperature scale and blue outlines.
+- A smoked glass badge that stays open while hovering the rail, connecting gap, or badge.
+- Live hardware temperature and fan RPM, refreshed every 1.5 seconds.
+- Click to open Settings; drag vertically to reposition. Default rail height: 127 pixels.
+- Apple SMC and CPU temperature detection, with a selectable sensor and Celsius/Fahrenheit display.
+- Optional login autostart. Settings follows the Omarchy accent and window rounding; full theme matching is planned.
+
+The rail lives behind application windows. It may be covered by them; it is intended as an ambient desktop display.
+
+## Compatibility
+
+Developed and verified on an **Intel MacBook running Omarchy and Hyprland on Wayland**. Other hardware and desktop environments are unverified. The current strip uses LayerShellQt; this is not a general X11 desktop widget.
+
+Temperature and fan availability depends on the kernel's hwmon drivers. Apple SMC (`applesmc`) and CPU (`coretemp`) sensors are detected; other hwmon temperature sensors may also appear. No fan-control functionality is provided.
+
+## Install from source on Omarchy / Arch Linux
+
+Install build and runtime dependencies:
+
+```bash
+sudo pacman -S --needed base-devel git qt6-base qt6-declarative qt6-wayland layer-shell-qt
+```
+
+Then clone and install the local Arch package:
+
+```bash
+git clone https://github.com/jezmccole/thermo.git
+cd thermo
+./bin/install
+```
+
+`bin/install` builds the application, creates an Arch package with `makepkg`, and invokes package installation, which may request your password. Build as your regular user.
+
+These instructions match the repository scripts; installation on a fresh machine has not yet been validated. There is no published AUR package or supported prebuilt release yet.
+
+To build without installing:
+
+```bash
+./bin/build
+./build/thermo --background
+```
 
 ## Usage
 
 ```bash
-# Launch Thermo (starts background strip and opens settings if run interactively)
-thermo
-
-# Open Settings window directly
-thermo settings
-
-# Run in background without opening settings (used for login autostart)
-thermo --background
-
-# Output current sensor readings and config in JSON
-thermo --json
-
-# Terminate running instance
-thermo quit
+thermo                 # Launch and show Settings
+thermo settings        # Show Settings in the running instance
+thermo --background    # Start quietly; duplicate background launches exit
+thermo close           # Close Settings while Thermo is running
+thermo toggle          # Toggle Settings while Thermo is running
+thermo --json          # Print temperature sensors and default sensor ID; exit
+thermo --version
+thermo quit            # Quit the running instance
 ```
 
-## Shortcuts (Settings Window)
+`--json` does not currently include saved configuration or fan readings. `close`, `toggle`, and `quit` should be used with an existing running instance; their no-instance behaviour still needs improvement.
 
-| Key | Action |
-| :--- | :--- |
-| `Esc` / `Q` | Close Settings (keeps desktop thermometer active) |
-| `Space` | Refresh sensors |
+To restart a running instance, run `thermo quit`, wait for it to exit, then run `thermo --background`.
 
-## License
+In Settings, `Esc` or `Q` closes the window while keeping the rail active. Use **Refresh** to rescan sensors.
 
-MIT © 2026 jezmccole
+## Configuration and autostart
+
+Preferences are stored in `${XDG_CONFIG_HOME:-~/.config}/thermo/config.json`. Settings saves changes automatically. Stop Thermo before editing this file manually, since shutdown writes the in-memory preferences back to disk.
+
+Autostart is enabled by default. The **Launch on Startup** control manages `${XDG_CONFIG_HOME:-~/.config}/autostart/thermo.desktop`. The package does not add a Hyprland-specific startup entry.
+
+The default sensor is Central Processor Proximity (`TC0P`) when available, then CPU package temperature, then a CPU average. Temperature scale bounds describe visual mapping, not hardware safety limits.
+
+## Troubleshooting and current limitations
+
+- **Cannot see the rail:** look at the right edge of the desktop with covering windows moved aside. Check that Thermo is running in a Wayland session.
+- **Missing fan speed:** some hardware exposes no readable `fan*_input` entries. Missing or invalid fan readings are shown as unavailable; 0 RPM is a valid stopped-fan reading.
+- **Unexpected temperature:** verify your selected sensor and compare with hwmon readings. Some existing temperature failure paths retain an old reading or return a fallback value. Removing these misleading fallbacks is the next milestone; do not treat the current display as a hardware safety alarm.
+- **Theme does not fully match:** only Settings accent and rounding currently follow Omarchy; the glass badge uses its own palette.
+- **Multiple installed copies:** `command -v thermo` shows which executable is used. A manually installed `~/.local/bin/thermo` may override the packaged `/usr/bin/thermo`.
+- Monitor selection, left-edge placement, full theme integration, and temperature history remain planned features.
+
+## Uninstall
+
+Quit Thermo first, disable **Launch on Startup** in Settings, and remove the package:
+
+```bash
+sudo pacman -R thermo
+```
+
+If you previously installed a separate copy in `~/.local/bin`, remove that copy too. Preferences remain available for a future reinstall. Remove the Thermo configuration directory and its autostart desktop file manually if you want a complete cleanup. Remove any startup entries you added yourself separately.
+
+## Development and contributions
+
+```bash
+./bin/build
+./bin/test
+```
+
+Tests run offscreen with a temporary configuration directory. Hardware-independent fan fixtures cover labels, stopped fans, and invalid values; some existing temperature tests also inspect host sensors. Hover, placement, and rendering require manual Wayland verification.
+
+Report bugs through [GitHub issues](https://github.com/jezmccole/thermo/issues), including Thermo/Omarchy versions, hardware, sensor driver, reproduction steps, and relevant logs. Check screenshots and logs for personal information before sharing. Pull requests are welcome: explain the problem, keep the change focused, and include relevant validation.
+
+Read the [product requirements](PRD.md) and [roadmap](ROADMAP.md) before starting a larger feature. Full contribution templates and automated checks are planned for release preparation.
+
+## Attribution and licence
+
+Created by **Kairos Medical Informatics Ltd**. Maintained at [jezmccole/thermo](https://github.com/jezmccole/thermo).
+
+Released under the [MIT licence](LICENSE). Existing copyright and third-party notices are preserved, including the Omacut / Monologue template attribution.
