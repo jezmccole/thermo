@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QTimer>
+#include <QWindow>
 #include <QVariantList>
 
 #include "sensormanager.h"
@@ -17,6 +18,8 @@ class Backend : public QObject {
     Q_PROPERTY(double normalizedTemperature READ normalizedTemperature NOTIFY temperatureChanged)
     Q_PROPERTY(QString formattedTemperature READ formattedTemperature NOTIFY temperatureChanged)
     Q_PROPERTY(QColor currentColor READ currentColor NOTIFY temperatureChanged)
+    Q_PROPERTY(QColor outlineColor READ outlineColor CONSTANT)
+    Q_PROPERTY(QColor coldColor READ coldColor CONSTANT)
 
     Q_PROPERTY(QString sensorId READ sensorId NOTIFY sensorChanged)
     Q_PROPERTY(QString sensorLabel READ sensorLabel NOTIFY sensorChanged)
@@ -43,6 +46,8 @@ public:
     double normalizedTemperature() const;
     QString formattedTemperature() const;
     QColor currentColor() const;
+    QColor outlineColor() const { return QColor(56, 189, 248); } // #38bdf8 Ice Cold Blue
+    QColor coldColor() const { return QColor(56, 189, 248); }
 
     QString sensorId() const { return m_sensorId; }
     QString sensorLabel() const;
@@ -72,6 +77,7 @@ public:
     Q_INVOKABLE void closeSettings();
     Q_INVOKABLE void quitApp();
     Q_INVOKABLE void refreshSensors();
+    Q_INVOKABLE void setInputRegion(QWindow *window, const QRect &region);
 
 signals:
     void temperatureChanged();
@@ -104,9 +110,9 @@ private:
 
     bool m_autostart = true;
     QString m_unit = "C";
-    int m_idleWidth = 5;
-    int m_expandedWidth = 12;
-    int m_barHeight = 380;
+    int m_idleWidth = 6;
+    int m_expandedWidth = 6;
+    int m_barHeight = 127;
     int m_railY = 210;
     QString m_edge = "right";
 

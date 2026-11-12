@@ -11,7 +11,25 @@
 class ThermoTests : public QObject {
     Q_OBJECT
 
+    QTemporaryDir configDir;
 private slots:
+    void initTestCase() {
+        QVERIFY(configDir.isValid());
+        qputenv("XDG_CONFIG_HOME", configDir.path().toUtf8());
+    }
+
+    void compactDefaultsAndColorEndpoints() {
+        Backend backend;
+        QCOMPARE(backend.barHeight(), 127);
+        backend.setBarHeight(127);
+        QCOMPARE(backend.barHeight(), 127);
+        const double temperature = backend.currentTemperature();
+        backend.setTemperatureRange(temperature, temperature + 100);
+        QCOMPARE(backend.currentColor(), QColor("#38bdf8"));
+        backend.setTemperatureRange(temperature - 100, temperature);
+        QCOMPARE(backend.currentColor(), QColor("#dc2626"));
+    }
+
     void sensorManagerFormatsAppleSmcLabels() {
         QCOMPARE(SensorManager::formatAppleSmcLabel("TC0P"), QString("Central Processor Proximity (TC0P)"));
         QCOMPARE(SensorManager::formatAppleSmcLabel("TC0C"), QString("CPU Core 0 (TC0C)"));
@@ -48,9 +66,7 @@ private slots:
         Backend backend;
         backend.setTemperatureRange(0.0, 100.0);
 
-        // At low temps -> Emerald Green
-        // At mid temps -> Amber / Burnt Orange
-        // At high temps -> Crimson Red
+        // Every sensor reading produces a valid display color.
         QColor col = backend.currentColor();
         QVERIFY(col.isValid());
         QVERIFY(col.red() >= 0 && col.red() <= 255);

@@ -7,4 +7,4 @@ cd "$ROOT/build/tests"
 
 qmake6 "$ROOT/tests/thermo_tests.pro"
 make -j"$(nproc)"
-QT_QPA_PLATFORM=offscreen ./thermo_tests
+QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=basic ./thermo_tests

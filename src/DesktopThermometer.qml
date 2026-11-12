@@ -14,15 +14,36 @@ Window {
     LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
     LayerShell.Window.scope: "thermo-desktop-strip"
 
-    property bool isHovered: mouseArea.containsMouse || (readoutPill.opacity > 0.1 && pillMouseArea.containsMouse)
+    // Fixed surface width: prevents Wayland layer shell resize configure oscillations
+    width: 280
+
+    // A window mask also defines the Wayland input region. Expand it before
+    // showing the badge, and retain it through the fade-out.
+    property rect inputRect: Qt.rect(
+        readoutPill.visible || isHovered || isDragging ? Math.floor(railContainer.x + readoutPill.x - 5) : railContainer.x - 12,
+        Math.max(0, railContainer.y - 8),
+        readoutPill.visible || isHovered || isDragging ? Math.ceil(readoutPill.width + 32 + railContainer.width) : railContainer.width + 16,
+        railContainer.height + 16)
+    onInputRectChanged: backend.setInputRegion(thermoWindow, inputRect)
+    Component.onCompleted: backend.setInputRegion(thermoWindow, inputRect)
+
+    property bool rawHover: mouseArea.containsMouse || (readoutPill.visible && pillMouseArea.containsMouse)
+    property bool isHovered: rawHover || hoverGraceTimer.running
     property bool isDragging: mouseArea.drag.active || pillMouseArea.drag.active
 
-    // Resting width is narrow so it never blocks desktop clicks when idle.
-    // Expands on hover/drag so the readout pill and interaction zone have full room.
-    width: (isHovered || isDragging) ? 220 : (backend.idleWidth + 8)
+    // Brief grace timer so moving smoothly between the rail and readout badge never flickers
+    Timer {
+        id: hoverGraceTimer
+        interval: 180
+        repeat: false
+    }
 
-    Behavior on width {
-        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    onRawHoverChanged: {
+        if (!rawHover && !isDragging) {
+            hoverGraceTimer.restart()
+        } else if (rawHover) {
+            hoverGraceTimer.stop()
+        }
     }
 
     Item {
@@ -30,20 +51,18 @@ Window {
         anchors.right: parent.right
         anchors.rightMargin: 2
         y: backend.railY
-        width: (isHovered || isDragging) ? backend.expandedWidth : backend.idleWidth
+
+        // Fixed width: the thermometer scale NEVER moves or expands horizontally on hover
+        width: backend.idleWidth
         height: backend.barHeight
 
-        Behavior on width {
-            NumberAnimation { duration: 180; easing.type: Easing.OutBack }
-        }
-
-        // Frosted glass background rail track
+        // Frosted glass background rail track with ice cold blue outline
         Rectangle {
             id: trackBackground
             anchors.fill: parent
             radius: width / 2
-            color: "#161922bb"
-            border.color: "#ffffff22"
+            color: "#d0141720"
+            border.color: Qt.rgba(backend.coldColor.r, backend.coldColor.g, backend.coldColor.b, 0.45) // Ice cold blue outline
             border.width: 1
 
             // Liquid temperature column filling from bottom
@@ -66,13 +85,13 @@ Window {
                     height: trackBackground.height
                     radius: trackBackground.radius
 
+                    // Continuous cold blue to crimson red spectrum (no green elements)
                     gradient: Gradient {
                         orientation: Gradient.Vertical
                         GradientStop { position: 0.00; color: "#dc2626" } // Crimson Red (hot)
-                        GradientStop { position: 0.25; color: "#ea580c" } // Burnt orange
-                        GradientStop { position: 0.55; color: "#f59e0b" } // Warm amber / burnt copper
-                        GradientStop { position: 0.80; color: "#84cc16" } // Lime
-                        GradientStop { position: 1.00; color: "#10b981" } // Emerald green (cool)
+                        GradientStop { position: 0.28; color: "#ea580c" } // Hot orange
+                        GradientStop { position: 0.55; color: "#94a3b8" } // Neutral midpoint
+                        GradientStop { position: 1.00; color: "#38bdf8" } // Arctic Cold Blue
                     }
                 }
 
@@ -95,46 +114,39 @@ Window {
             }
         }
 
-        // Floating holographic readout pill adjacent to the current temperature level
+        // Floating holographic readout pill anchored adjacent to current temperature level
         Item {
             id: readoutPill
             anchors.right: trackBackground.left
             anchors.rightMargin: 12
-            // Align vertically with the meniscus level
-            y: Math.max(0, Math.min(railContainer.height - height, (railContainer.height - fillClip.height) - height / 2))
+            // Centered on the rail so sensor updates cannot move the hover target.
+            y: (railContainer.height - height) / 2
 
             width: pillContent.width + 24
             height: pillContent.height + 16
 
             opacity: (isHovered || isDragging) ? 1.0 : 0.0
             visible: opacity > 0.001
-            scale: (isHovered || isDragging) ? 1.0 : 0.85
 
             Behavior on opacity {
-                NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-            }
-            Behavior on scale {
-                NumberAnimation { duration: 220; easing.type: Easing.OutBack }
-            }
-            Behavior on y {
-                NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
             }
 
-            // Frosted glass card backdrop
+            // Frosted glass card backdrop with ice cold blue outline
             Rectangle {
                 anchors.fill: parent
                 radius: 12
-                color: "#0d1117ea"
-                border.color: Qt.rgba(backend.currentColor.r, backend.currentColor.g, backend.currentColor.b, 0.45)
+                color: "#f20d1117"
+                border.color: Qt.rgba(backend.coldColor.r, backend.coldColor.g, backend.coldColor.b, 0.45)
                 border.width: 1
 
-                // Subtle ambient glow shadow behind the card
+                // Subtle ambient glow shadow behind the card matching current temperature
                 Rectangle {
                     anchors.fill: parent
                     anchors.margins: -1
                     radius: 13
                     color: "transparent"
-                    border.color: Qt.rgba(backend.currentColor.r, backend.currentColor.g, backend.currentColor.b, 0.20)
+                    border.color: Qt.rgba(backend.currentColor.r, backend.currentColor.g, backend.currentColor.b, 0.25)
                     border.width: 1
                     z: -1
                 }
@@ -146,7 +158,7 @@ Window {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 12
                 height: 1
-                color: Qt.rgba(backend.currentColor.r, backend.currentColor.g, backend.currentColor.b, 0.6)
+                color: Qt.rgba(backend.coldColor.r, backend.coldColor.g, backend.coldColor.b, 0.55)
             }
 
             Column {
@@ -197,22 +209,25 @@ Window {
                     maximumLineCount: 1
                 }
 
-                // Hint for user
+                // Hint for user in cold blue accent
                 Text {
                     text: isDragging ? qsTr("Moving position...") : qsTr("Drag to move • Click for settings")
-                    color: Qt.rgba(theme.accentForeground === "white" ? 1 : 0.8, 0.8, 0.8, 0.5)
+                    color: Qt.rgba(backend.coldColor.r, backend.coldColor.g, backend.coldColor.b, 0.7)
                     font.pixelSize: 9
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
             }
 
             // Mouse interaction directly on the holographic readout pill
+            // Right margin extends across the 12px gap to ensure seamless overlap
             MouseArea {
                 id: pillMouseArea
                 anchors.fill: parent
+                anchors.rightMargin: -16
+                anchors.margins: -4
                 hoverEnabled: true
                 cursorShape: isDragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
-                visible: readoutPill.opacity > 0.1
+                enabled: readoutPill.opacity > 0.05
 
                 drag.target: railContainer
                 drag.axis: Drag.YAxis
@@ -228,7 +243,7 @@ Window {
                 }
 
                 onPositionChanged: (mouse) => {
-                    if (Math.abs(pillMouseArea.mouseY - startY) > 5) {
+                    if (pillMouseArea.drag.active || Math.abs(pillMouseArea.mouseY - startY) > 5) {
                         moved = true
                     }
                 }
@@ -247,11 +262,14 @@ Window {
             }
         }
 
-        // Mouse interaction for hover, dragging, and click-for-settings
+        // Mouse interaction for hover, dragging, and click-for-settings on the rail
         MouseArea {
             id: mouseArea
             anchors.fill: parent
-            anchors.margins: -6 // Generous hit area around the thin strip
+            anchors.leftMargin: -12
+            anchors.rightMargin: -4
+            anchors.topMargin: -8
+            anchors.bottomMargin: -8
             hoverEnabled: true
             cursorShape: isDragging ? Qt.ClosedHandCursor : (isHovered ? Qt.PointingHandCursor : Qt.ArrowCursor)
 
@@ -269,7 +287,7 @@ Window {
             }
 
             onPositionChanged: (mouse) => {
-                if (Math.abs(mouseArea.mouseY - startY) > 5) {
+                if (mouseArea.drag.active || Math.abs(mouseArea.mouseY - startY) > 5) {
                     moved = true
                 }
             }

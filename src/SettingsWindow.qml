@@ -338,9 +338,9 @@ ApplicationWindow {
                         }
                         Slider {
                             Layout.fillWidth: true
-                            from: 200
+                            from: 80
                             to: 650
-                            stepSize: 20
+                            stepSize: 1
                             value: backend.barHeight
                             onMoved: backend.setBarHeight(value)
                         }

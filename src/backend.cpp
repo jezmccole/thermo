@@ -12,7 +12,7 @@
 
 Backend::Backend(QObject *parent)
     : QObject(parent),
-      m_configPath(QDir::homePath() + "/.config/thermo/config.json") {
+      m_configPath(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/thermo/config.json") {
 
     m_sensors = m_sensorManager.scanSensors();
     loadConfig();
@@ -57,13 +57,7 @@ QColor Backend::currentColor() const {
 }
 
 QColor Backend::calculateGradientColor(double t) const {
-    // Heat gradient:
-    // 0.0 -> Cool Emerald Green rgb(16, 185, 129) #10B981
-    // 0.4 -> Lime / Chartreuse rgb(132, 204, 22) #84CC16
-    // 0.65 -> Warm Burnt Amber / Copper rgb(245, 158, 11) #F59E0B
-    // 0.85 -> Burnt Vermilion rgb(234, 88, 12) #EA580C
-    // 1.0 -> Deep Crimson Red rgb(220, 38, 38) #DC2626
-
+    // Cold blue through a neutral midpoint to orange and hot red.
     t = std::clamp(t, 0.0, 1.0);
 
     struct ColorStop {
@@ -72,14 +66,13 @@ QColor Backend::calculateGradientColor(double t) const {
     };
 
     static const ColorStop stops[] = {
-        { 0.00,  16, 185, 129 }, // Emerald green
-        { 0.35, 132, 204,  22 }, // Lime green
-        { 0.60, 245, 158,  11 }, // Burnt amber
-        { 0.82, 234,  88,  12 }, // Burnt orange-red
-        { 1.00, 220,  38,  38 }  // Crimson red
+        { 0.00, 56, 189, 248 },
+        { 0.45, 148, 163, 184 },
+        { 0.72, 234, 88, 12 },
+        { 1.00, 220, 38, 38 }
     };
 
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 3; ++i) {
         if (t >= stops[i].pos && t <= stops[i + 1].pos) {
             double range = stops[i + 1].pos - stops[i].pos;
             double factor = (range > 0.0) ? (t - stops[i].pos) / range : 0.0;
@@ -175,7 +168,7 @@ void Backend::setRailY(int y) {
 
 void Backend::setBarHeight(int h) {
     if (m_barHeight != h) {
-        m_barHeight = std::clamp(h, 150, 750);
+        m_barHeight = std::clamp(h, 80, 750);
         emit appearanceChanged();
         saveConfig();
     }
@@ -220,7 +213,7 @@ void Backend::quitApp() {
 }
 
 void Backend::syncAutostartDesktopFile() {
-    QString autostartDir = QDir::homePath() + "/.config/autostart";
+    QString autostartDir = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/autostart";
     QString desktopPath = autostartDir + "/thermo.desktop";
 
     if (m_autostart) {
@@ -262,11 +255,11 @@ void Backend::loadConfig() {
     if (obj.contains("maxTemp"))
         m_maxTemp = obj.value("maxTemp").toDouble(100.0);
     if (obj.contains("idleWidth"))
-        m_idleWidth = obj.value("idleWidth").toInt(5);
+        m_idleWidth = obj.value("idleWidth").toInt(6);
     if (obj.contains("expandedWidth"))
-        m_expandedWidth = obj.value("expandedWidth").toInt(12);
+        m_expandedWidth = obj.value("expandedWidth").toInt(6);
     if (obj.contains("barHeight"))
-        m_barHeight = obj.value("barHeight").toInt(380);
+        m_barHeight = obj.value("barHeight").toInt(127);
     if (obj.contains("railY"))
         m_railY = obj.value("railY").toInt(210);
     if (obj.contains("edge"))
@@ -293,4 +286,9 @@ void Backend::saveConfig() {
     if (file.open(QIODevice::WriteOnly)) {
         file.write(QJsonDocument(obj).toJson(QJsonDocument::Indented));
     }
+}
+
+void Backend::setInputRegion(QWindow *window, const QRect &region) {
+    if (window)
+        window->setMask(QRegion(region));
 }
