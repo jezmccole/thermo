@@ -39,3 +39,12 @@ isolated instance. The badge was visually checked above the test window.
 
 Physical multi-monitor unplug/reconnect, other display scales, and an assistive
 technology audit remain outstanding. Headless CI cannot replace these checks.
+
+## Light-theme rail refinement
+
+The follow-up visual change uses translucent theme-coloured tracks, softer
+neutral/blue outlines, and simpler dark-ink markers on pale backplates for light
+themes. The temperature cap is thinner with a subtler pulse. Widths, gaps, input
+regions, and colour scales are unchanged. Offscreen renders were inspected
+against ivory and wallpaper-coloured backgrounds and compared with the dark
+appearance. The existing 34 regression cases/data rows pass.

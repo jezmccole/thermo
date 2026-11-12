@@ -5,6 +5,13 @@ import org.kde.layershell as LayerShell
 Window {
     id: thermoWindow
     property bool followTheme: backend.appearanceMode === "omarchy"
+    readonly property bool lightRails: followTheme && theme.tokens.light
+    readonly property color themeBackground: followTheme ? theme.tokens.background : "#141720"
+    readonly property color railSurface: lightRails
+        ? Qt.rgba(themeBackground.r, themeBackground.g, themeBackground.b, 0.72) : "#d0141720"
+    readonly property color railOutline: lightRails ? "#48516070"
+        : Qt.rgba(chromeColor.r, chromeColor.g, chromeColor.b, 0.45)
+    readonly property color fanOutline: lightRails ? "#600369a1" : "#38bdf8"
     property real textScale: followTheme ? theme.tokens.baseSize / 12 : 1
     property color textColor: followTheme ? theme.tokens.foreground : "#f8fafc"
     property color mutedColor: followTheme ? theme.tokens.muted : "#94a3b8"
@@ -91,18 +98,19 @@ Window {
         RailMarker {
             objectName: "heatRailMarker"
             symbol: "heat"
+            lightSurface: thermoWindow.lightRails
             visible: backend.fanRailEnabled
             x: (railContainer.width - width) / 2 + (thermoWindow.leftEdge ? 1 : -1) * Math.max(0, 3 - railContainer.width / 2)
             y: -15
         }
 
-        // Frosted glass background rail track with ice cold blue outline
+        // Light tracks stay quiet against wallpaper; thermal colour belongs to the fill.
         Rectangle {
             id: trackBackground
             anchors.fill: parent
             radius: width / 2
-            color: "#d0141720"
-            border.color: backend.temperatureStatus === "live" ? Qt.rgba(thermoWindow.chromeColor.r, thermoWindow.chromeColor.g, thermoWindow.chromeColor.b, 0.45) : thermoWindow.warningColor
+            color: thermoWindow.railSurface
+            border.color: backend.temperatureStatus === "live" ? thermoWindow.railOutline : thermoWindow.warningColor
             border.width: 1
 
             // Liquid temperature column filling from bottom
@@ -144,7 +152,7 @@ Window {
                     anchors.top: parent.top
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    height: Math.max(3, parent.width)
+                    height: thermoWindow.lightRails ? 2 : Math.max(3, parent.width)
                     radius: height / 2
                     color: backend.currentColor
 
@@ -152,7 +160,7 @@ Window {
                         objectName: "temperaturePulse"
                         running: !backend.reducedMotion
                         loops: Animation.Infinite
-                        NumberAnimation { to: 0.65; duration: 2400; easing.type: Easing.InOutSine }
+                        NumberAnimation { to: thermoWindow.lightRails ? 0.88 : 0.65; duration: 2400; easing.type: Easing.InOutSine }
                         NumberAnimation { to: 1.00; duration: 2400; easing.type: Easing.InOutSine }
                     }
                 }
@@ -165,6 +173,7 @@ Window {
             RailMarker {
                 objectName: "fanRailMarker"
                 symbol: "fan"
+                lightSurface: thermoWindow.lightRails
                 x: (parent.width - width) / 2 + (thermoWindow.leftEdge ? 1 : -1) * Math.max(0, 3 - parent.width / 2)
                 y: -15
             }
@@ -173,9 +182,9 @@ Window {
             width: backend.idleWidth
             height: parent.height
             radius: 3
-            color: "#d0141720"
+            color: thermoWindow.railSurface
             border.width: 1
-            border.color: backend.fanLevelAvailable ? "#38bdf8" : thermoWindow.warningColor
+            border.color: backend.fanLevelAvailable ? thermoWindow.fanOutline : thermoWindow.warningColor
             Rectangle {
                 objectName: "fanFill"
                 visible: backend.fanLevelAvailable
