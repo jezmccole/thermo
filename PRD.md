@@ -8,7 +8,7 @@ The initial audience is Omarchy users, with verified behaviour currently limited
 
 ## Current product
 
-The shipped implementation provides a fixed desktop-edge rail with a saved monitor choice and either-edge placement, a stable hover badge with a smoked glass finish, selectable hardware temperature, fan RPM, Celsius/Fahrenheit, vertical dragging, Settings, and login autostart. The default height is 127 pixels. Follow Omarchy appearance reads supported theme surface, text, border, and typography tokens live; Classic Glass preserves the original palette. The optional blue fan rail shares the temperature rail’s position.
+The shipped implementation provides a fixed desktop-edge rail with a saved monitor choice and either-edge placement, a foreground hover/keyboard inspection badge with a smoked glass finish, selectable hardware temperature, fan RPM, Celsius/Fahrenheit, vertical dragging, Settings, and login autostart. The default height is 127 pixels. Follow Omarchy appearance reads supported theme surface, text, border, and typography tokens live; Classic Glass preserves the original palette. The optional blue fan rail shares the temperature rail’s position.
 
 Temperature polling uses fresh snapshots. Missing and faulty selected sensors are flagged explicitly; a real earlier reading is marked stale, and no prior reading means unavailable. The rail shows an amber outline with no temperature fill during failure. Standalone JSON reports unavailable values as null with status/error metadata.
 
@@ -23,7 +23,7 @@ Temperature polling uses fresh snapshots. Missing and faulty selected sensors ar
 | Theme integration | Follow Omarchy while preserving thermal meaning | Theme changes update surfaces, text, borders, and typography without restart; Classic Glass remains selectable; temperature remains blue-to-red | Implemented with fixture and rendered checks |
 | Desktop fit | Respect monitor choice and display scaling | Retain disconnected display preference, fall back visibly, mirror content inward, and clamp to available space without overwriting saved dimensions | Implemented with automated geometry checks; physical hotplug validation pending |
 | Settings layout | Keep controls readable and consistently spaced | Real page/card padding, wrapping descriptions, scrollable sections, and persistent actions at narrow widths and larger fonts | Implemented with narrow-width, larger-font, and rendered checks |
-| Accessibility | Support legible and accessible inspection | Maintain readable contrast and allow keyboard access and reduced motion | Planned; not yet audited |
+| Accessibility | Support legible and accessible inspection | Maintain readable contrast and allow keyboard access and reduced motion | Keyboard inspection, focus scrolling, and reduced motion implemented with event tests; broader accessibility audit pending |
 | Installation | Be reproducible for a new user | Build, package, install, launch, autostart, upgrade, and uninstall succeed on a clean supported environment | Scripts exist; clean-machine validation planned |
 | Resource use | Stay lightweight during routine use | Record idle CPU, memory, and wakeups on the reference machine and compare future changes against that baseline | Measurement planned; no numerical claims yet |
 

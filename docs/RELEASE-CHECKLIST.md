@@ -14,7 +14,7 @@ The Build, test and package workflow covers a fresh Arch dependency installation
 - [ ] Verify Wayland hover, badge transitions, input masks, click versus drag, both rails, and warning/recovery states.
 - [ ] Verify light/dark themes, live replacement, Classic Glass, font sizes, and display scaling.
 - [ ] Verify implemented monitor/edge options on physical multi-monitor hardware, including unplug/reconnect and primary-display changes.
-- [ ] Complete keyboard inspection and reduced-motion work listed in milestone 4.
+- [ ] Audit keyboard inspection and reduced motion with assistive technology; implementation and event regression tests are in place.
 - [ ] Verify Settings padding, card spacing, scrolling, and persistent actions at narrow widths and larger fonts.
 - [ ] Record idle CPU, RSS memory, and wakeups on the reference machine; assess changes against that baseline.
 - [ ] Capture a short demonstration without private desktop content.

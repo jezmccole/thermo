@@ -36,6 +36,9 @@ done
 [ -f "$XDG_CONFIG_HOME/autostart/thermo.desktop" ]
 "$thermo_binary" --background
 "$thermo_binary" settings
+"$thermo_binary" settings
+"$thermo_binary" inspect
+"$thermo_binary" inspect
 "$thermo_binary" close
 "$thermo_binary" toggle
 "$thermo_binary" close

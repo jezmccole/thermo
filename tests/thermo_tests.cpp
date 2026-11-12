@@ -200,11 +200,11 @@ private slots:
         backend.setFanRailEnabled(true);
         backend.setEdge("left");
         QTRY_COMPARE(rail->x(), 2.0);
-        QCOMPARE(fan->x(), rail->width() + 4);
-        QCOMPARE(badge->x(), rail->width() + 12);
+        QCOMPARE(fan->x(), rail->width() + window->property("railGap").toDouble());
+        QCOMPARE(badge->x(), 2 + window->property("groupWidth").toDouble() + 8);
         window->setProperty("isHovered", true);
         QCOMPARE(rail->x(), 2.0);
-        const auto region = window->property("inputRect").toRectF();
+        const auto region = window->property("railRegion").toRectF();
         QVERIFY(region.left() >= 0);
         QVERIFY(region.right() <= window->width());
         backend.setRailY(10000);
@@ -216,8 +216,7 @@ private slots:
         QCOMPARE(backend.barHeight(), 750);
         window->setHeight(480);
         backend.setBarHeight(127);
-        rail->setY(160); // Simulate a completed drag and restore its binding.
-        QVERIFY(QMetaObject::invokeMethod(window, "finishDrag", Q_ARG(QVariant, true)));
+        backend.setRailY(160);
         QCOMPARE(backend.railY(), 160);
         window->setHeight(220);
         QTRY_VERIFY(rail->y() + rail->height() <= 200);
@@ -225,8 +224,245 @@ private slots:
         QTRY_COMPARE(rail->y(), 160.0);
         backend.setEdge("right");
         QTRY_COMPARE(rail->x(), window->width() - rail->width() - 2);
-        QCOMPARE(fan->x(), -10.0);
-        QVERIFY(badge->x() < 0);
+        QCOMPARE(fan->x(), -fan->width() - window->property("railGap").toDouble());
+        QVERIFY(badge->x() >= 0);
+    }
+
+    void sharedRailGeometry_data() {
+        QTest::addColumn<int>("railWidth");
+        QTest::addColumn<QString>("edge");
+        for (int width : {2, 6, 12}) for (const auto &edge : {QString("left"), QString("right")})
+            QTest::newRow(qPrintable(edge + QString::number(width))) << width << edge;
+    }
+
+    void sharedRailGeometry() {
+        QFETCH(int, railWidth); QFETCH(QString, edge);
+        QTemporaryDir root; setupCpu(root.path());
+        Backend backend(nullptr, root.path());
+        backend.setIdleWidth(railWidth); backend.setFanRailEnabled(true); backend.setEdge(edge);
+        backend.setReducedMotion(true);
+        Theme theme(configDir.path());
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        engine.rootContext()->setContextProperty("theme", &theme);
+        QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+        engine.load(QUrl("qrc:/DesktopThermometer.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        window->setHeight(200);
+        auto badgeWindow = window->findChild<QQuickWindow*>("badgeWindow");
+        badgeWindow->setHeight(200);
+        auto rail = window->findChild<QQuickItem*>("temperatureRail");
+        auto fan = window->findChild<QQuickItem*>("fanRail");
+        auto heatMarker = window->findChild<QQuickItem*>("heatRailMarker");
+        auto fanMarker = window->findChild<QQuickItem*>("fanRailMarker");
+        QCOMPARE(window->width(), 48); QCOMPARE(badgeWindow->width(), 320);
+        QCOMPARE(rail->width(), double(railWidth)); QCOMPARE(fan->width(), rail->width());
+        const auto heatRect = heatMarker->mapRectToScene(heatMarker->boundingRect()).adjusted(-1, -1, 1, 1);
+        const auto fanRect = fanMarker->mapRectToScene(fanMarker->boundingRect()).adjusted(-1, -1, 1, 1);
+        QVERIFY(!heatRect.intersects(fanRect));
+        QVERIFY(heatRect.left() >= 0); QVERIFY(heatRect.right() <= 48);
+        QVERIFY(fanRect.left() >= 0); QVERIFY(fanRect.right() <= 48);
+        backend.setBarHeight(750); backend.setRailY(10000);
+        QTRY_VERIFY(rail->y() + rail->height() <= 180);
+        const auto x = rail->x();
+        backend.inspect();
+        QTRY_VERIFY(badgeWindow->isVisible());
+        auto badge = window->findChild<QQuickItem*>("readoutBadge");
+        QVERIFY(badge->x() >= 0); QVERIFY(badge->x() + badge->width() <= 320);
+        QVERIFY(badge->y() >= 0); QVERIFY(badge->y() + badge->height() <= 200);
+        QCOMPARE(rail->x(), x);
+        const auto originalBounds = badge->mapRectToScene(badge->boundingRect());
+        writeReading(root.path(), "temp1_input", "bad"); backend.refreshSensors();
+        QCoreApplication::processEvents();
+        const auto warningBounds = badge->mapRectToScene(badge->boundingRect());
+        QVERIFY(warningBounds.height() >= originalBounds.height());
+        writeReading(root.path(), "temp1_input", "60000"); backend.refreshSensors();
+        QCoreApplication::processEvents();
+        QCOMPARE(badge->mapRectToScene(badge->boundingRect()), warningBounds);
+        const auto rect = badgeWindow->property("badgeRegion").toRectF();
+        const auto corridor = badgeWindow->property("corridorRegion").toRectF();
+        QCOMPARE(badgeWindow->mask(), QRegion(rect.toAlignedRect()) + QRegion(corridor.toAlignedRect()));
+        QVERIFY(!badgeWindow->mask().contains(QPoint(edge == "left" ? 319 : 0, qRound(rect.center().y()))));
+        QVERIFY(!badgeWindow->mask().contains(QPoint(qRound(corridor.center().x()), qRound(rect.top() + 2))));
+        backend.inspect();
+        QTRY_VERIFY(!badgeWindow->isVisible());
+        QVERIFY(badgeWindow->mask().isEmpty());
+        QCOMPARE(warnings.count(), 0);
+    }
+
+    void pointerJitterDragCancellationAndHover() {
+        Backend backend(nullptr, hwmonRoot.path());
+        backend.setEdge("left"); backend.setReducedMotion(true);
+        Theme theme(configDir.path());
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        engine.rootContext()->setContextProperty("theme", &theme);
+        QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+        engine.load(QUrl("qrc:/DesktopThermometer.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        window->resize(48, 600);
+        auto badgeWindow = window->findChild<QQuickWindow*>("badgeWindow");
+        badgeWindow->setHeight(600);
+        auto rail = window->findChild<QQuickItem*>("temperatureRail");
+        auto badge = window->findChild<QQuickItem*>("readoutBadge");
+        QTest::qWait(20);
+        const QPoint point(4, qRound(rail->y() + 35));
+        const int savedY = backend.railY();
+        QTest::mouseMove(window, point);
+        QTRY_VERIFY(badgeWindow->isVisible());
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, point);
+        QTest::mouseMove(window, point + QPoint(0, 6));
+        QVERIFY(!window->property("isDragging").toBool());
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, point + QPoint(0, 6));
+        QVERIFY(backend.settingsVisible()); QCOMPARE(backend.railY(), savedY);
+        backend.closeSettings();
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, point);
+        QTest::mouseMove(window, point + QPoint(0, 40));
+        QVERIFY(window->property("isDragging").toBool());
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, point + QPoint(0, 40));
+        QCOMPARE(backend.railY(), savedY + 40); QVERIFY(!backend.settingsVisible());
+        const QPoint badgePoint = badge->mapToScene(QPointF(100, 20)).toPoint();
+        QTest::mousePress(badgeWindow, Qt::LeftButton, Qt::NoModifier, badgePoint);
+        QTest::mouseMove(badgeWindow, badgePoint + QPoint(0, 30));
+        QVERIFY(window->property("isDragging").toBool());
+        badgeWindow->mouseGrabberItem()->ungrabMouse();
+        QTRY_VERIFY(!window->property("pressed").toBool());
+        QCOMPARE(backend.railY(), savedY + 40); QCOMPARE(rail->y(), double(savedY + 40));
+        QVERIFY(!backend.settingsVisible());
+        // A stationary hold keeps the badge mapped, even after leaving both regions.
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, point + QPoint(0, 40));
+        QTest::mouseMove(window, QPoint(47, 590));
+        QTest::qWait(220);
+        QVERIFY(badgeWindow->isVisible());
+        window->mouseGrabberItem()->ungrabMouse();
+        QTest::mouseMove(badgeWindow, badge->mapToScene(QPointF(100, 25)).toPoint());
+        QTest::mouseMove(window, QPoint(47, 590));
+        QTest::qWait(60); QVERIFY(badgeWindow->isVisible());
+        QTest::mouseMove(badgeWindow, QPoint(319, 590));
+        QTRY_VERIFY(!badgeWindow->isVisible());
+        QCOMPARE(warnings.count(), 0);
+    }
+
+    void inspectionAndReducedMotionPersist() {
+        {
+            Backend backend(nullptr, hwmonRoot.path());
+            QVERIFY(!backend.reducedMotion()); QVERIFY(!backend.inspecting());
+            Theme theme(configDir.path());
+            QQmlApplicationEngine engine;
+            engine.rootContext()->setContextProperty("backend", &backend);
+            engine.rootContext()->setContextProperty("theme", &theme);
+            engine.load(QUrl("qrc:/DesktopThermometer.qml"));
+            QVERIFY(!engine.rootObjects().isEmpty());
+            auto window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+            window->resize(48, 600);
+            auto badgeWindow = window->findChild<QQuickWindow*>("badgeWindow");
+            badgeWindow->setHeight(600);
+            auto pulse = window->findChild<QObject*>("temperaturePulse");
+            QVERIFY(pulse); QVERIFY(pulse->property("running").toBool());
+            backend.setReducedMotion(true);
+            QVERIFY(!pulse->property("running").toBool());
+            backend.openSettings(); backend.inspect();
+            QVERIFY(!backend.settingsVisible()); QVERIFY(backend.inspecting());
+            backend.inspect(); QVERIFY(!backend.inspecting());
+            backend.inspect(); backend.setEdge("left"); QVERIFY(!backend.inspecting());
+            backend.inspect();
+            auto rail = window->findChild<QQuickItem*>("temperatureRail");
+            QTest::mouseMove(window, QPoint(4, qRound(rail->y() + 20)));
+            QTRY_VERIFY_WITH_TIMEOUT(!backend.inspecting(), 11000);
+            QVERIFY(badgeWindow->isVisible());
+            QTest::mouseMove(window, QPoint(47, 590));
+            QTRY_VERIFY(!badgeWindow->isVisible());
+            backend.inspect();
+        }
+        Backend restored(nullptr, hwmonRoot.path());
+        QVERIFY(restored.reducedMotion()); QVERIFY(!restored.inspecting());
+    }
+
+    void settingsKeyboardAndStableSelectors() {
+        QTemporaryDir root; setupCpu(root.path());
+        Backend backend(nullptr, root.path());
+        Theme theme(configDir.path());
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        engine.rootContext()->setContextProperty("theme", &theme);
+        QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+        engine.load(QUrl("qrc:/SettingsWindow.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        window->resize(520, 480); backend.openSettings();
+        window->requestActivate(); QTRY_VERIFY(window->isActive());
+        auto sensor = window->findChild<QQuickItem*>("sensorSelector");
+        auto screen = window->findChild<QQuickItem*>("screenSelector");
+        QVERIFY(sensor); QVERIFY(screen);
+        sensor->forceActiveFocus(Qt::TabFocusReason);
+        auto popup = sensor->property("popup").value<QObject*>(); QVERIFY(popup);
+        QVERIFY(QMetaObject::invokeMethod(popup, "open"));
+        QTRY_VERIFY(popup->property("visible").toBool());
+        const auto choices = sensor->property("choices");
+        writeReading(root.path(), "temp2_label", "Core 1"); writeReading(root.path(), "temp2_input", "40000");
+        backend.refreshSensors();
+        QCOMPARE(sensor->property("choices"), choices);
+        QTest::keyClick(window, Qt::Key_Q);
+        QVERIFY(backend.settingsVisible()); QVERIFY(popup->property("visible").toBool());
+        QTest::keyClick(window, Qt::Key_Escape);
+        QTRY_VERIFY(!popup->property("visible").toBool()); QVERIFY(backend.settingsVisible());
+        QTRY_VERIFY(sensor->property("choices") != choices);
+        // Commit an ID from the frozen model before the deferred refresh.
+        QVERIFY(QMetaObject::invokeMethod(popup, "open"));
+        const auto frozen = sensor->property("choices").toList();
+        QTest::keyClick(window, Qt::Key_End);
+        const auto chosenIndex = sensor->property("highlightedIndex").toInt();
+        QVERIFY(chosenIndex >= 0);
+        QVERIFY(QFile::remove(root.path() + "/hwmon0/temp2_input")); backend.refreshSensors();
+        QTest::keyClick(window, Qt::Key_Return);
+        QTRY_VERIFY(!popup->property("visible").toBool());
+        QCOMPARE(backend.sensorId(), frozen[chosenIndex].toMap()["id"].toString());
+        const auto indexBeforeWheel = sensor->property("currentIndex");
+        auto scrollForWheel = window->findChild<QQuickItem*>("settingsScroll");
+        auto flick = scrollForWheel->property("contentItem").value<QQuickItem*>();
+        QVERIFY(flick);
+        const double beforeWheel = flick->property("contentY").toDouble();
+        const auto wheelPos = sensor->mapToScene(sensor->boundingRect().center());
+        QWheelEvent wheel(wheelPos, window->mapToGlobal(wheelPos.toPoint()), QPoint(), QPoint(0, -120), Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+        QCoreApplication::sendEvent(window, &wheel);
+        QTRY_VERIFY(flick->property("contentY").toDouble() > beforeWheel);
+        QCOMPARE(sensor->property("currentIndex"), indexBeforeWheel);
+        auto screenPopup = screen->property("popup").value<QObject*>();
+        QVERIFY(QMetaObject::invokeMethod(screenPopup, "open"));
+        const auto screens = screen->property("choices");
+        backend.setScreenName("temporarily-disconnected");
+        QCOMPARE(screen->property("choices"), screens);
+        QVERIFY(QMetaObject::invokeMethod(screenPopup, "close"));
+        QTRY_VERIFY(screen->property("choices") != screens);
+        // Traverse forwards and backwards; every page control must be visible.
+        sensor->forceActiveFocus(Qt::TabFocusReason);
+        auto scroll = window->findChild<QQuickItem*>("settingsScroll");
+        bool reachedLowControl = false;
+        for (int direction : {1, -1}) for (int i = 0; i < 28; ++i) {
+            QTest::keyClick(window, Qt::Key_Tab, direction == 1 ? Qt::NoModifier : Qt::ShiftModifier);
+            QCoreApplication::processEvents();
+            auto focus = window->activeFocusItem(); QVERIFY(focus);
+            if (focus->property("activeFocusOnTab").toBool()) {
+                auto ancestor = focus;
+                while (ancestor && ancestor != scroll) ancestor = ancestor->parentItem();
+                if (ancestor) {
+                    const auto rect = focus->mapRectToItem(scroll, focus->boundingRect());
+                    QVERIFY2(rect.top() >= -1 && rect.bottom() <= scroll->height() + 1, qPrintable(QString::number(rect.top())));
+                    reachedLowControl |= focus == window->findChild<QQuickItem*>("companyWebsiteLink");
+                }
+            }
+        }
+        QVERIFY(reachedLowControl);
+        backend.setUnit("F");
+        QCOMPARE(window->findChild<QObject*>("temperatureScaleLabel")->property("text").toString(), QString("86°F – 212°F"));
+        QSignalSpy requests(&backend, &Backend::settingsRequested);
+        backend.openSettings(); backend.openSettings(); QCOMPARE(requests.count(), 2);
+        QTest::keyClick(window, Qt::Key_W, Qt::ControlModifier); QTRY_VERIFY(!backend.settingsVisible());
+        backend.openSettings(); QTest::keyClick(window, Qt::Key_I, Qt::ControlModifier);
+        QTRY_VERIFY(backend.inspecting()); QVERIFY(!backend.settingsVisible());
+        QCOMPARE(warnings.count(), 0);
     }
 
     void monitorPreferenceAndFallbackPersist() {
@@ -340,6 +576,8 @@ private slots:
             QTRY_COMPARE(window->property("textScale").toDouble(), 1.5);
             QCoreApplication::processEvents();
         }
+        if (qEnvironmentVariableIsSet("THERMO_TEST_CAPTURE_DIR"))
+            QVERIFY(window->grabWindow().save(qEnvironmentVariable("THERMO_TEST_CAPTURE_DIR") + "/settings-" + QString::number(windowWidth) + "-" + QString::number(fontSize) + (light ? "-light" : "") + ".png"));
         QCOMPARE(warnings.count(), 0);
     }
 

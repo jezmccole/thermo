@@ -27,7 +27,7 @@ class Backend : public QObject {
     Q_PROPERTY(QColor coldColor READ coldColor CONSTANT)
 
     Q_PROPERTY(QString sensorId READ sensorId NOTIFY sensorChanged)
-    Q_PROPERTY(QString sensorLabel READ sensorLabel NOTIFY sensorChanged)
+    Q_PROPERTY(QString sensorLabel READ sensorLabel NOTIFY sensorsUpdated)
     Q_PROPERTY(QVariantList availableSensors READ availableSensors NOTIFY sensorsUpdated)
     Q_PROPERTY(QVariantList fanSpeeds READ fanSpeeds NOTIFY fanSpeedsChanged)
     Q_PROPERTY(int sensorCount READ sensorCount NOTIFY sensorsUpdated)
@@ -37,6 +37,8 @@ class Backend : public QObject {
     Q_PROPERTY(double fanLevel READ fanLevel NOTIFY fanSpeedsChanged)
     Q_PROPERTY(bool fanLevelAvailable READ fanLevelAvailable NOTIFY fanSpeedsChanged)
     Q_PROPERTY(QString fanRailDescription READ fanRailDescription NOTIFY fanSpeedsChanged)
+    Q_PROPERTY(bool reducedMotion READ reducedMotion NOTIFY appearanceChanged)
+    Q_PROPERTY(bool inspecting READ inspecting NOTIFY inspectingChanged)
     Q_PROPERTY(bool autostart READ autostart NOTIFY autostartChanged)
     Q_PROPERTY(QString unit READ unit NOTIFY unitChanged)
     Q_PROPERTY(int idleWidth READ idleWidth NOTIFY appearanceChanged)
@@ -77,6 +79,8 @@ public:
     double fanLevel() const;
     bool fanLevelAvailable() const;
     QString fanRailDescription() const;
+    bool reducedMotion() const { return m_reducedMotion; }
+    bool inspecting() const { return m_inspectTimer.isActive(); }
     bool autostart() const { return m_autostart; }
     QString unit() const { return m_unit; }
     int idleWidth() const { return m_idleWidth; }
@@ -104,11 +108,13 @@ public:
     Q_INVOKABLE void setIdleWidth(int w);
     Q_INVOKABLE void setTemperatureRange(double minT, double maxT);
 
+    Q_INVOKABLE void setReducedMotion(bool enabled);
+    Q_INVOKABLE void inspect();
     Q_INVOKABLE void openSettings();
     Q_INVOKABLE void closeSettings();
     Q_INVOKABLE void quitApp();
     Q_INVOKABLE void refreshSensors();
-    Q_INVOKABLE void setInputRegion(QWindow *window, const QRect &region);
+    Q_INVOKABLE void setInputRegion(QWindow *window, const QVariantList &regions);
 
 signals:
     void temperatureChanged();
@@ -123,6 +129,8 @@ signals:
     void placementChanged();
     void screensChanged();
     void settingsVisibilityChanged();
+    void settingsRequested();
+    void inspectingChanged();
 
 private slots:
     void pollTemperature();
@@ -149,6 +157,8 @@ private:
 
     QString m_appearanceMode = "omarchy";
     bool m_fanRailEnabled = false;
+    bool m_reducedMotion = false;
+    QTimer m_inspectTimer;
     bool m_autostart = true;
     QString m_unit = "C";
     int m_idleWidth = 6;

@@ -16,7 +16,7 @@ A quiet desktop thermometer for Omarchy: glance at the rail, hover for a readabl
 - Apple SMC and CPU temperature detection, with a selectable sensor and Celsius/Fahrenheit display.
 - Optional login autostart. Follow Omarchy appearance adapts badge and Settings colours, readable text, borders, font size/family, and window rounding live. Classic Glass retains the original smoked glass palette.
 
-The rail lives behind application windows. It may be covered by them; it is intended as an ambient desktop display.
+The rails live behind application windows as an ambient desktop display. The readout badge uses a foreground overlay, including above fullscreen windows, without taking keyboard focus. Both rails use the same 2–12 pixel width setting.
 
 ## Compatibility
 
@@ -55,7 +55,8 @@ To build without installing:
 
 ```bash
 thermo                 # Launch and show Settings
-thermo settings        # Show Settings in the running instance
+thermo settings        # Show or raise Settings in the running instance
+thermo inspect         # Show readout for 10 seconds; repeat to dismiss
 thermo --background    # Start quietly; duplicate background launches exit
 thermo close           # Close Settings while Thermo is running
 thermo toggle          # Toggle Settings while Thermo is running
@@ -68,7 +69,9 @@ thermo quit            # Quit the running instance
 
 To restart a running instance, run `thermo quit`, wait for it to exit, then run `thermo --background`.
 
-In Settings, `Esc` or `Q` closes the window while keeping the rail active. Use **Refresh** to rescan sensors.
+In Settings, `Esc` closes an open selector first, then Settings. `Ctrl+W` closes Settings, `Ctrl+Q` quits Thermo, and `Ctrl+I` shows the readout. The **Inspect readout** button also closes Settings and shows the badge for 10 seconds without taking keyboard focus. Repeat `thermo inspect` to dismiss it; hovering can keep it open after the timer ends. Inspection is temporary and clears on monitor or edge changes. Use **Refresh sensors** to rescan sensors.
+
+Enable **Reduce motion** in Settings to disable pulsing and fill/fade animations. The short hover grace period remains enabled. This preference defaults to off and is saved automatically.
 
 ## Desktop placement and Settings
 
@@ -76,7 +79,7 @@ Choose **Primary display (automatic)** or a named monitor under Desktop placemen
 
 Both screen edges are supported. The temperature rail stays closest to the edge; the companion fan rail and badge face inward. Hover never moves the rails. Sizes use logical pixels so Qt applies display scaling automatically. The displayed height and vertical position are clamped to the available space while retaining your saved size and position; dragging saves a new position.
 
-Settings has consistent page/card padding, grouped fields, and a scrolling page with persistent Close/Quit buttons. Content is centered and capped at 760 logical pixels in wide or tiled windows. Physical multi-monitor hotplug and additional hardware/display-scale combinations still need manual validation.
+Settings has consistent page/card padding, grouped fields, and a scrolling page with persistent Inspect/Close/Quit buttons. Content is centered and capped at 760 logical pixels in wide or tiled windows. Physical multi-monitor hotplug and additional hardware/display-scale combinations still need manual validation.
 
 ## Configuration and autostart
 
@@ -114,7 +117,7 @@ If you previously installed a separate copy in `~/.local/bin`, remove that copy 
 ./bin/check-runtime
 ```
 
-Tests run offscreen with a temporary configuration directory. Hardware-independent fan fixtures cover labels, stopped fans, and invalid values; temperature fixtures cover failures, recovery, composite averages, and JSON availability without requiring host sensors. Hover, placement, and rendering require manual Wayland verification.
+Tests run offscreen with a temporary configuration directory. Hardware-independent fan fixtures cover labels, stopped fans, and invalid values; temperature fixtures cover failures, recovery, composite averages, and JSON availability without requiring host sensors. Event tests cover click jitter, dragging, cancellation, hover transitions, masks, shared rail widths, selector snapshots, keyboard focus visibility, inspection, and reduced-motion persistence. Compositor placement and click-through require Wayland verification.
 
 Report bugs through [GitHub issues](https://github.com/jezmccole/thermo/issues), including Thermo/Omarchy versions, hardware, sensor driver, reproduction steps, and relevant logs. Check screenshots and logs for personal information before sharing. Pull requests are welcome: explain the problem, keep the change focused, and include relevant validation.
 

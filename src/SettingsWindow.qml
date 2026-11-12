@@ -34,7 +34,29 @@ ApplicationWindow {
 
     onClosing: (close) => { close.accepted = false; backend.closeSettings() }
     Shortcut { sequence: "Esc"; onActivated: backend.closeSettings() }
-    Shortcut { sequence: "Q"; onActivated: backend.closeSettings() }
+    Shortcut { sequence: "Ctrl+W"; onActivated: backend.closeSettings() }
+    Shortcut { sequence: "Ctrl+Q"; onActivated: backend.quitApp() }
+    Shortcut { sequence: "Ctrl+I"; onActivated: backend.inspect() }
+    Connections {
+        target: backend
+        function onSettingsRequested() { settingsWin.raise(); settingsWin.requestActivate() }
+    }
+    // Only page descendants participate: popup delegates and footer buttons do
+    // not belong to the scrolling page, even when they own keyboard focus.
+    onActiveFocusItemChanged: Qt.callLater(ensureFocusVisible)
+    function ensureFocusVisible() {
+        const item = activeFocusItem
+        if (!item) return
+        let ancestor = item
+        while (ancestor && ancestor !== settingsPage) ancestor = ancestor.parent
+        if (!ancestor) return
+        const flick = scroll.contentItem
+        const pos = item.mapToItem(settingsPage, 0, 0)
+        const margin = 12
+        if (pos.y < flick.contentY + margin) flick.contentY = Math.max(0, pos.y - margin)
+        else if (pos.y + item.height > flick.contentY + flick.height - margin)
+            flick.contentY = Math.min(Math.max(0, flick.contentHeight - flick.height), pos.y + item.height - flick.height + margin)
+    }
 
     component Section: SettingsSection {
         style: settingsWin
@@ -54,6 +76,8 @@ ApplicationWindow {
     component Selector: ComboBox {
         Layout.fillWidth: true
         implicitHeight: Math.max(44, implicitContentHeight + topPadding + bottomPadding)
+        // Keep this explicit: wheel events over a closed selector scroll the page.
+        wheelEnabled: false
     }
     component ToggleRow: RowLayout {
         id: toggleRow
@@ -166,7 +190,18 @@ ApplicationWindow {
                     Description { text: qsTr("Choose the hardware sensor to display. Central Processor Proximity (TC0P) is preferred when available.") }
                     Selector {
                         id: sensorCombo
-                        model: backend.availableSensors
+                        objectName: "sensorSelector"
+                        property var choices: []
+                        model: choices
+                        function refreshChoices() {
+                            if (popup.visible) return
+                            choices = backend.availableSensors
+                            updateSelectedIndex()
+                        }
+                        Connections {
+                            target: sensorCombo.popup
+                            function onClosed() { Qt.callLater(sensorCombo.refreshChoices) }
+                        }
                         textRole: "label"
                         Accessible.name: qsTr("Temperature sensor")
                         function updateSelectedIndex() {
@@ -175,11 +210,11 @@ ApplicationWindow {
                             }
                             currentIndex = -1
                         }
-                        Component.onCompleted: updateSelectedIndex()
+                        Component.onCompleted: refreshChoices()
                         Connections {
                             target: backend
-                            function onSensorChanged() { sensorCombo.updateSelectedIndex() }
-                            function onSensorsUpdated() { sensorCombo.updateSelectedIndex() }
+                            function onSensorChanged() { sensorCombo.refreshChoices() }
+                            function onSensorsUpdated() { sensorCombo.refreshChoices() }
                         }
                         onActivated: (index) => { if (index >= 0) backend.setSensorId(model[index].id) }
                         delegate: ItemDelegate {
@@ -203,7 +238,22 @@ ApplicationWindow {
                         Label { text: qsTr("Monitor") }
                         Selector {
                             id: screenCombo
-                            model: backend.availableScreens
+                            objectName: "screenSelector"
+                            property var choices: []
+                            model: choices
+                            function refreshChoices() {
+                                if (popup.visible) return
+                                choices = backend.availableScreens
+                                updateSelectedIndex()
+                            }
+                            Connections {
+                                target: backend
+                                function onScreensChanged() { screenCombo.refreshChoices() }
+                            }
+                            Connections {
+                                target: screenCombo.popup
+                                function onClosed() { Qt.callLater(screenCombo.refreshChoices) }
+                            }
                             textRole: "label"
                             Accessible.name: qsTr("Monitor")
                             function updateSelectedIndex() {
@@ -212,8 +262,7 @@ ApplicationWindow {
                                 }
                                 currentIndex = 0
                             }
-                            Component.onCompleted: updateSelectedIndex()
-                            onModelChanged: updateSelectedIndex()
+                            Component.onCompleted: refreshChoices()
                             onActivated: (index) => { if (index >= 0) backend.setScreenName(model[index].name) }
                         }
                     }
@@ -244,6 +293,11 @@ ApplicationWindow {
                             Accessible.name: qsTr("Appearance")
                             onActivated: (index) => backend.setAppearanceMode(index === 0 ? "omarchy" : "classic")
                         }
+                    }
+                    ToggleRow {
+                        label: qsTr("Reduce motion")
+                        checked: backend.reducedMotion
+                        onToggled: (value) => backend.setReducedMotion(value)
                     }
                     ToggleRow {
                         label: qsTr("Show companion fan rail")
@@ -289,7 +343,10 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         Label { text: qsTr("Temperature scale") }
                         Text {
-                            text: Math.round(backend.minTemperature) + "°C – " + Math.round(backend.maxTemperature) + "°C"
+                            objectName: "temperatureScaleLabel"
+                            text: backend.unit === "F"
+                                ? Math.round(backend.minTemperature * 9 / 5 + 32) + "°F – " + Math.round(backend.maxTemperature * 9 / 5 + 32) + "°F"
+                                : Math.round(backend.minTemperature) + "°C – " + Math.round(backend.maxTemperature) + "°C"
                             color: settingsWin.accentColor
                             font: settingsWin.font
                         }
@@ -358,6 +415,7 @@ ApplicationWindow {
         contentItem: RowLayout {
             spacing: 12
             Button { text: qsTr("Quit Thermo"); onClicked: backend.quitApp() }
+            Button { objectName: "inspectButton"; text: qsTr("Inspect readout"); onClicked: backend.inspect() }
             Item { Layout.fillWidth: true }
             Button { text: qsTr("Close"); highlighted: true; onClicked: backend.closeSettings() }
         }

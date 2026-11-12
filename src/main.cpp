@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
                                "Output current sensor readings as JSON and exit");
     parser.addOption(jsonOpt);
 
-    parser.addPositionalArgument("action", "Action to perform: status, settings, quit");
+    parser.addPositionalArgument("action", "Action to perform: status, settings, inspect, close, toggle, quit");
     parser.process(app);
 
     const QStringList posArgs = parser.positionalArguments();
@@ -63,7 +63,9 @@ int main(int argc, char *argv[]) {
     QLocalSocket clientSocket;
     clientSocket.connectToServer(socketName);
     if (clientSocket.waitForConnected(250)) {
-        if (action == "quit") {
+        if (action == "inspect") {
+            clientSocket.write("INSPECT\n");
+        } else if (action == "quit") {
             clientSocket.write("QUIT\n");
         } else if (action == "close") {
             clientSocket.write("CLOSE_SETTINGS\n");
@@ -117,7 +119,8 @@ int main(int argc, char *argv[]) {
                     const QString msg = QString::fromUtf8(client->readLine()).trimmed();
                     client->write("OK\n");
                     client->flush();
-                    if (msg == "SHOW_SETTINGS") backend.openSettings();
+                    if (msg == "INSPECT") backend.inspect();
+                    else if (msg == "SHOW_SETTINGS") backend.openSettings();
                     else if (msg == "CLOSE_SETTINGS") backend.closeSettings();
                     else if (msg == "TOGGLE_SETTINGS") {
                         if (backend.settingsVisible()) backend.closeSettings();
@@ -146,7 +149,9 @@ int main(int argc, char *argv[]) {
     // Determine initial settings window visibility:
     // If started via launcher or with --settings, show settings window.
     // If started via --background / --autostart, keep settings closed.
-    if (parser.isSet(settingsOpt) || action == "settings") {
+    if (action == "inspect") {
+        backend.inspect();
+    } else if (parser.isSet(settingsOpt) || action == "settings") {
         backend.openSettings();
     } else if (!parser.isSet(backgroundOpt)) {
         // First interactive launch opens settings so user can see it right away

@@ -17,6 +17,12 @@ Backend::Backend(QObject *parent, const QString &hwmonRoot)
     : QObject(parent), m_sensorManager(nullptr, hwmonRoot), m_hwmonRoot(hwmonRoot),
       m_configPath(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/thermo/config.json") {
 
+    m_inspectTimer.setSingleShot(true);
+    m_inspectTimer.setInterval(10000);
+    connect(&m_inspectTimer, &QTimer::timeout, this, &Backend::inspectingChanged);
+    connect(this, &Backend::placementChanged, this, [this] {
+        if (inspecting()) { m_inspectTimer.stop(); emit inspectingChanged(); }
+    });
     m_sensors = m_sensorManager.scanSensors();
     loadConfig();
 
@@ -335,12 +341,27 @@ void Backend::setTemperatureRange(double minT, double maxT) {
     }
 }
 
+void Backend::setReducedMotion(bool enabled) {
+    if (enabled == m_reducedMotion) return;
+    m_reducedMotion = enabled;
+    emit appearanceChanged();
+    saveConfig();
+}
+
+void Backend::inspect() {
+    closeSettings();
+    if (inspecting()) m_inspectTimer.stop();
+    else m_inspectTimer.start();
+    emit inspectingChanged();
+}
+
 void Backend::openSettings() {
     if (!m_settingsVisible) {
         m_settingsVisible = true;
         refreshSensors();
         emit settingsVisibilityChanged();
     }
+    emit settingsRequested();
 }
 
 void Backend::closeSettings() {
@@ -392,6 +413,7 @@ void Backend::loadConfig() {
     if (obj.contains("sensorId"))
         m_sensorId = obj.value("sensorId").toString();
     if (obj.value("appearanceMode").toString() == "classic") m_appearanceMode = "classic";
+    m_reducedMotion = obj.value("reducedMotion").toBool(false);
     m_fanRailEnabled = obj.value("fanRailEnabled").toBool(false);
     if (obj.contains("autostart"))
         m_autostart = obj.value("autostart").toBool();
@@ -402,7 +424,7 @@ void Backend::loadConfig() {
     if (obj.contains("maxTemp"))
         m_maxTemp = obj.value("maxTemp").toDouble(100.0);
     if (obj.contains("idleWidth"))
-        m_idleWidth = obj.value("idleWidth").toInt(6);
+        m_idleWidth = std::clamp(obj.value("idleWidth").toInt(6), 2, 12);
     if (obj.contains("expandedWidth"))
         m_expandedWidth = obj.value("expandedWidth").toInt(6);
     if (obj.contains("barHeight"))
@@ -420,6 +442,7 @@ void Backend::saveConfig() {
     QJsonObject obj;
     obj["sensorId"] = m_sensorId;
     obj["appearanceMode"] = m_appearanceMode;
+    obj["reducedMotion"] = m_reducedMotion;
     obj["fanRailEnabled"] = m_fanRailEnabled;
     obj["autostart"] = m_autostart;
     obj["unit"] = m_unit;
@@ -438,7 +461,8 @@ void Backend::saveConfig() {
     }
 }
 
-void Backend::setInputRegion(QWindow *window, const QRect &region) {
-    if (window)
-        window->setMask(QRegion(region));
+void Backend::setInputRegion(QWindow *window, const QVariantList &regions) {
+    QRegion mask;
+    for (const auto &value : regions) mask += value.toRectF().toAlignedRect();
+    if (window) window->setMask(mask);
 }

@@ -22,54 +22,60 @@ Window {
     LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
     LayerShell.Window.scope: "thermo-desktop-strip"
 
-    // Fixed surface width: prevents Wayland layer shell resize configure oscillations
-    width: 280
-
-    // A window mask also defines the Wayland input region. Expand it before
-    // showing the badge, and retain it through the fade-out.
+    // Both layer surfaces stay fixed in size, including during hover and drag.
+    width: 48
     property int topHitMargin: backend.fanRailEnabled ? 20 : 8
-    property rect inputRect: {
-        const railLeft = railContainer.x - (leftEdge ? 4 : 12)
-        const railRight = railContainer.x + railContainer.width + (leftEdge ? 12 : 4)
-        const includeBadge = readoutPill.visible || isHovered || isDragging
-        const left = Math.max(0, includeBadge ? Math.min(railLeft, railContainer.x + readoutPill.x - 4) : railLeft)
-        const right = Math.min(width, includeBadge ? Math.max(railRight, railContainer.x + readoutPill.x + readoutPill.width + 4) : railRight)
-        const top = Math.max(0, railContainer.y + Math.min(-topHitMargin, includeBadge ? readoutPill.y - 4 : -topHitMargin))
-        const bottom = Math.min(height, railContainer.y + Math.max(railContainer.height + 8, includeBadge ? readoutPill.y + readoutPill.height + 4 : 0))
-        return Qt.rect(left, top, Math.max(1, right - left), Math.max(1, bottom - top))
-    }
-    onInputRectChanged: backend.setInputRegion(thermoWindow, inputRect)
-    Component.onCompleted: {
-        backend.configureDesktopWindow(thermoWindow)
-        visible = true
-        backend.setInputRegion(thermoWindow, inputRect)
-    }
-
+    readonly property real railGap: Math.max(4, 12 - backend.idleWidth)
+    readonly property real groupWidth: backend.fanRailEnabled ? backend.idleWidth * 2 + railGap : backend.idleWidth
+    readonly property real groupLeft: leftEdge ? 2 : width - 2 - groupWidth
     readonly property real effectiveBarHeight: Math.min(backend.barHeight, Math.max(1, height - 48))
     readonly property real maximumRailY: Math.max(28, height - effectiveBarHeight - 20)
     function clampRailY(value) { return Math.max(28, Math.min(maximumRailY, value)) }
-    function finishDrag(moved) {
-        if (moved) backend.setRailY(Math.round(railContainer.y))
-        railContainer.y = Qt.binding(function() { return thermoWindow.clampRailY(backend.railY) })
+    property rect railRegion: Qt.rect(Math.max(0, groupLeft - 2), Math.max(0, railContainer.y - topHitMargin),
+                                      groupWidth + 4, effectiveBarHeight + topHitMargin + 8)
+    onRailRegionChanged: backend.setInputRegion(thermoWindow, [railRegion])
+    Component.onCompleted: {
+        backend.configureDesktopWindow(thermoWindow)
+        backend.setInputRegion(thermoWindow, [railRegion])
+        visible = true
     }
 
-    property bool rawHover: mouseArea.containsMouse || (readoutPill.visible && pillMouseArea.containsMouse)
+    property bool rawHover: mouseArea.containsMouse || (badgeWindow.visible && (pillMouseArea.containsMouse || corridorMouse.containsMouse))
     property bool isHovered: rawHover || hoverGraceTimer.running
-    property bool isDragging: mouseArea.drag.active || pillMouseArea.drag.active
-
-    // Brief grace timer so moving smoothly between the rail and readout badge never flickers
-    Timer {
-        id: hoverGraceTimer
-        interval: 180
-        repeat: false
+    property bool isDragging: false
+    property bool pressed: false
+    property real pressY: 0
+    property real originalY: 0
+    readonly property bool badgeWanted: isHovered || pressed || backend.inspecting
+    function beginPress(area, mouse) {
+        const point = area.mapToGlobal(mouse.x, mouse.y)
+        pressY = point.y
+        originalY = railContainer.y
+        pressed = true
+        isDragging = false
     }
-
+    function movePress(area, mouse) {
+        if (!pressed) return
+        const point = area.mapToGlobal(mouse.x, mouse.y)
+        const dy = point.y - pressY
+        if (!isDragging && Math.abs(dy) >= Qt.styleHints.startDragDistance) isDragging = true
+        if (isDragging) railContainer.y = clampRailY(originalY + dy)
+    }
+    function finishPress(cancelled) {
+        if (!pressed) return
+        const dragged = isDragging
+        if (dragged && !cancelled) backend.setRailY(Math.round(railContainer.y))
+        railContainer.y = Qt.binding(function() { return thermoWindow.clampRailY(backend.railY) })
+        if (dragged && !cancelled) badgeWindow.retainedY = readoutPill.y
+        pressed = false
+        isDragging = false
+        if (!cancelled && !dragged) backend.openSettings()
+        if (!rawHover) hoverGraceTimer.restart()
+    }
+    Timer { id: hoverGraceTimer; interval: 180 }
     onRawHoverChanged: {
-        if (!rawHover && !isDragging) {
-            hoverGraceTimer.restart()
-        } else if (rawHover) {
-            hoverGraceTimer.stop()
-        }
+        if (rawHover) hoverGraceTimer.stop()
+        else if (!pressed) hoverGraceTimer.restart()
     }
 
     Item {
@@ -86,7 +92,7 @@ Window {
             objectName: "heatRailMarker"
             symbol: "heat"
             visible: backend.fanRailEnabled
-            x: (railContainer.width - width) / 2
+            x: (railContainer.width - width) / 2 + (thermoWindow.leftEdge ? 1 : -1) * Math.max(0, 3 - railContainer.width / 2)
             y: -15
         }
 
@@ -111,6 +117,7 @@ Window {
                 clip: true
 
                 Behavior on height {
+                    enabled: !backend.reducedMotion
                     NumberAnimation { duration: 650; easing.type: Easing.OutCubic }
                 }
 
@@ -142,6 +149,8 @@ Window {
                     color: backend.currentColor
 
                     SequentialAnimation on opacity {
+                        objectName: "temperaturePulse"
+                        running: !backend.reducedMotion
                         loops: Animation.Infinite
                         NumberAnimation { to: 0.65; duration: 2400; easing.type: Easing.InOutSine }
                         NumberAnimation { to: 1.00; duration: 2400; easing.type: Easing.InOutSine }
@@ -156,12 +165,12 @@ Window {
             RailMarker {
                 objectName: "fanRailMarker"
                 symbol: "fan"
-                anchors.horizontalCenter: parent.horizontalCenter
+                x: (parent.width - width) / 2 + (thermoWindow.leftEdge ? 1 : -1) * Math.max(0, 3 - parent.width / 2)
                 y: -15
             }
             visible: backend.fanRailEnabled
-            x: thermoWindow.leftEdge ? railContainer.width + 4 : -10
-            width: 6
+            x: thermoWindow.leftEdge ? railContainer.width + thermoWindow.railGap : -width - thermoWindow.railGap
+            width: backend.idleWidth
             height: parent.height
             radius: 3
             color: "#d0141720"
@@ -180,25 +189,88 @@ Window {
                     GradientStop { position: 0.5; color: "#38bdf8" }
                     GradientStop { position: 1; color: "#1e3a8a" }
                 }
-                Behavior on height { NumberAnimation { duration: 650; easing.type: Easing.OutCubic } }
+                Behavior on height { enabled: !backend.reducedMotion; NumberAnimation { duration: 650; easing.type: Easing.OutCubic } }
             }
         }
 
-        // Floating holographic readout pill anchored adjacent to current temperature level
+    }
+
+    Window {
+        id: badgeWindow
+        objectName: "badgeWindow"
+        transientParent: null
+        width: 320
+        color: "transparent"
+        flags: Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus
+        visible: false
+        LayerShell.Window.layer: LayerShell.Window.LayerOverlay
+        LayerShell.Window.anchors: (thermoWindow.leftEdge ? LayerShell.Window.AnchorLeft : LayerShell.Window.AnchorRight) | LayerShell.Window.AnchorTop | LayerShell.Window.AnchorBottom
+        LayerShell.Window.exclusionZone: 0
+        LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
+        LayerShell.Window.scope: "thermo-readout"
+        property real retainedHeight: 0
+        property real retainedY: 0
+        property real targetOpacity: 0
+        property rect badgeRegion: Qt.rect(readoutPill.x, readoutPill.y, readoutPill.width, readoutPill.height)
+        property rect corridorRegion: Qt.rect(thermoWindow.leftEdge ? 2 : readoutPill.x + readoutPill.width,
+                                              readoutPill.y + readoutPill.height / 2 - 4,
+                                              thermoWindow.groupWidth + 8, 8)
+        function updateMask() { backend.setInputRegion(badgeWindow, [badgeRegion, corridorRegion]) }
+        function reveal() {
+            if (!visible) {
+                retainedHeight = pillContent.height + 16
+                retainedY = Math.max(4, Math.min(height - retainedHeight - 4, thermoWindow.y - badgeWindow.y + railContainer.y + (railContainer.height - retainedHeight) / 2))
+            }
+            updateMask()
+            visible = true
+            targetOpacity = 1
+        }
+        onBadgeRegionChanged: { if (visible) updateMask() }
+        onCorridorRegionChanged: { if (visible) updateMask() }
+        Component.onCompleted: {
+            backend.configureDesktopWindow(badgeWindow)
+            if (thermoWindow.badgeWanted) reveal()
+        }
+        Connections {
+            target: thermoWindow
+            function onBadgeWantedChanged() {
+                if (thermoWindow.badgeWanted) badgeWindow.reveal()
+                else badgeWindow.targetOpacity = 0
+            }
+        }
+        Connections {
+            target: pillContent
+            function onHeightChanged() {
+                if (badgeWindow.visible) badgeWindow.retainedHeight = Math.max(badgeWindow.retainedHeight, pillContent.height + 16)
+            }
+        }
+        MouseArea {
+            id: corridorMouse
+            x: badgeWindow.corridorRegion.x; y: badgeWindow.corridorRegion.y
+            width: badgeWindow.corridorRegion.width; height: badgeWindow.corridorRegion.height
+            hoverEnabled: true
+            onPressed: (mouse) => thermoWindow.beginPress(corridorMouse, mouse)
+            onPositionChanged: (mouse) => thermoWindow.movePress(corridorMouse, mouse)
+            onReleased: thermoWindow.finishPress(!thermoWindow.isDragging && !containsMouse)
+            onCanceled: thermoWindow.finishPress(true)
+        }
         Item {
             id: readoutPill
             objectName: "readoutBadge"
-            x: thermoWindow.leftEdge ? railContainer.width + 12 : -width - 12
-            // Centered on the rail so sensor updates cannot move the hover target.
-            y: Math.max(4 - railContainer.y, Math.min(thermoWindow.height - railContainer.y - height - 4, (railContainer.height - height) / 2))
-
+            x: thermoWindow.leftEdge ? 2 + thermoWindow.groupWidth + 8 : badgeWindow.width - 2 - thermoWindow.groupWidth - 8 - width
+            y: Math.max(4, Math.min(badgeWindow.height - height - 4, badgeWindow.retainedY + (thermoWindow.pressed ? railContainer.y - thermoWindow.originalY : 0)))
             width: pillContent.width + 24
-            height: pillContent.height + 16
-
-            opacity: (isHovered || isDragging) ? 1.0 : 0.0
-            visible: opacity > 0.001
-
+            height: Math.max(pillContent.height + 16, badgeWindow.retainedHeight)
+            opacity: badgeWindow.targetOpacity
+            onOpacityChanged: {
+                if (opacity === 0 && !thermoWindow.badgeWanted) {
+                    // Unmap first: an empty Qt mask means the whole surface.
+                    badgeWindow.visible = false
+                    backend.setInputRegion(badgeWindow, [])
+                }
+            }
             Behavior on opacity {
+                enabled: !backend.reducedMotion
                 NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
             }
 
@@ -246,9 +318,9 @@ Window {
 
             // Connecting hairline tick between pill and rail
             Rectangle {
-                x: thermoWindow.leftEdge ? -12 : parent.width
+                x: thermoWindow.leftEdge ? -8 : parent.width
                 anchors.verticalCenter: parent.verticalCenter
-                width: 12
+                width: 8
                 height: 1
                 color: Qt.rgba(thermoWindow.chromeColor.r, thermoWindow.chromeColor.g, thermoWindow.chromeColor.b, 0.55)
             }
@@ -359,7 +431,7 @@ Window {
                     width: 224
                     elide: Text.ElideRight
                     horizontalAlignment: Text.AlignHCenter
-                    text: isDragging ? qsTr("Moving position...") : qsTr("Drag to move • Click for settings")
+                    text: thermoWindow.isDragging ? qsTr("Moving position...") : qsTr("Drag to move • Click for settings")
                     color: Qt.rgba(thermoWindow.chromeColor.r, thermoWindow.chromeColor.g, thermoWindow.chromeColor.b, 0.7)
                     font.family: thermoWindow.textFamily
                     font.pixelSize: Math.round(9 * thermoWindow.textScale)
@@ -367,85 +439,29 @@ Window {
                 }
             }
 
-            // Mouse interaction directly on the holographic readout pill
-            // Right margin extends across the 12px gap to ensure seamless overlap
             MouseArea {
                 id: pillMouseArea
                 anchors.fill: parent
-                anchors.rightMargin: -16
-                anchors.margins: -4
                 hoverEnabled: true
-                cursorShape: isDragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
-                enabled: readoutPill.opacity > 0.05
-
-                drag.target: railContainer
-                drag.axis: Drag.YAxis
-                drag.minimumY: 28
-                drag.maximumY: thermoWindow.maximumRailY
-
-                property real startY: 0
-                property bool moved: false
-
-                onPressed: (mouse) => {
-                    startY = pillMouseArea.mouseY
-                    moved = false
-                }
-
-                onPositionChanged: (mouse) => {
-                    if (pillMouseArea.drag.active || Math.abs(pillMouseArea.mouseY - startY) > 5) {
-                        moved = true
-                    }
-                }
-
-                onReleased: thermoWindow.finishDrag(moved)
-                onCanceled: thermoWindow.finishDrag(false)
-
-                onClicked: {
-                    if (!moved) {
-                        backend.openSettings()
-                    }
-                }
+                cursorShape: thermoWindow.isDragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                onPressed: (mouse) => thermoWindow.beginPress(pillMouseArea, mouse)
+                onPositionChanged: (mouse) => thermoWindow.movePress(pillMouseArea, mouse)
+                onReleased: thermoWindow.finishPress(!thermoWindow.isDragging && !containsMouse)
+                onCanceled: thermoWindow.finishPress(true)
             }
         }
-
-        // Mouse interaction for hover, dragging, and click-for-settings on the rail
-        MouseArea {
-            id: mouseArea
-            anchors.fill: parent
-            anchors.leftMargin: thermoWindow.leftEdge ? -4 : -12
-            anchors.rightMargin: thermoWindow.leftEdge ? -12 : -4
-            anchors.topMargin: -thermoWindow.topHitMargin
-            anchors.bottomMargin: -8
-            hoverEnabled: true
-            cursorShape: isDragging ? Qt.ClosedHandCursor : (isHovered ? Qt.PointingHandCursor : Qt.ArrowCursor)
-
-            drag.target: railContainer
-            drag.axis: Drag.YAxis
-            drag.minimumY: 28
-            drag.maximumY: thermoWindow.maximumRailY
-
-            property real startY: 0
-            property bool moved: false
-
-            onPressed: (mouse) => {
-                startY = mouseArea.mouseY
-                moved = false
-            }
-
-            onPositionChanged: (mouse) => {
-                if (mouseArea.drag.active || Math.abs(mouseArea.mouseY - startY) > 5) {
-                    moved = true
-                }
-            }
-
-            onReleased: thermoWindow.finishDrag(moved)
-            onCanceled: thermoWindow.finishDrag(false)
-
-            onClicked: {
-                if (!moved) {
-                    backend.openSettings()
-                }
-            }
-        }
+    }
+    MouseArea {
+        id: mouseArea
+        objectName: "railMouseArea"
+        x: thermoWindow.railRegion.x; y: thermoWindow.railRegion.y
+        width: thermoWindow.railRegion.width; height: thermoWindow.railRegion.height
+        hoverEnabled: true
+        preventStealing: true
+        cursorShape: thermoWindow.isDragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+        onPressed: (mouse) => thermoWindow.beginPress(mouseArea, mouse)
+        onPositionChanged: (mouse) => thermoWindow.movePress(mouseArea, mouse)
+        onReleased: thermoWindow.finishPress(!thermoWindow.isDragging && !containsMouse)
+        onCanceled: thermoWindow.finishPress(true)
     }
 }
