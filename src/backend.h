@@ -24,6 +24,7 @@ class Backend : public QObject {
     Q_PROPERTY(QString sensorId READ sensorId NOTIFY sensorChanged)
     Q_PROPERTY(QString sensorLabel READ sensorLabel NOTIFY sensorChanged)
     Q_PROPERTY(QVariantList availableSensors READ availableSensors NOTIFY sensorsUpdated)
+    Q_PROPERTY(QVariantList fanSpeeds READ fanSpeeds NOTIFY fanSpeedsChanged)
     Q_PROPERTY(int sensorCount READ sensorCount NOTIFY sensorsUpdated)
 
     Q_PROPERTY(bool autostart READ autostart NOTIFY autostartChanged)
@@ -52,6 +53,7 @@ public:
     QString sensorId() const { return m_sensorId; }
     QString sensorLabel() const;
     QVariantList availableSensors() const;
+    QVariantList fanSpeeds() const { return m_fanSpeeds; }
     int sensorCount() const { return m_sensors.size(); }
 
     bool autostart() const { return m_autostart; }
@@ -84,6 +86,7 @@ signals:
     void rangeChanged();
     void sensorChanged();
     void sensorsUpdated();
+    void fanSpeedsChanged();
     void autostartChanged();
     void unitChanged();
     void appearanceChanged();
@@ -103,6 +106,7 @@ private:
     QTimer m_pollTimer;
 
     QList<SensorInfo> m_sensors;
+    QVariantList m_fanSpeeds;
     QString m_sensorId;
     double m_currentTemp = 45.0; // In Celsius
     double m_minTemp = 30.0;

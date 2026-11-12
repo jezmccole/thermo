@@ -136,7 +136,29 @@ Window {
             Rectangle {
                 anchors.fill: parent
                 radius: 12
-                color: "#f20d1117"
+                // Neutral smoked glass: a bright upper bevel over a dense base.
+                gradient: Gradient {
+                    GradientStop { position: 0; color: "#f2596069" }
+                    GradientStop { position: 0.32; color: "#f0353b43" }
+                    GradientStop { position: 1; color: "#f21c2128" }
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: 2
+                    radius: 10
+                    color: "transparent"
+                    border.width: 1
+                    border.color: "#35ffffff"
+                }
+                Rectangle {
+                    anchors.top: parent.top
+                    anchors.topMargin: 3
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: parent.width - 28
+                    height: 1
+                    color: "#75ffffff"
+                }
                 border.color: Qt.rgba(backend.coldColor.r, backend.coldColor.g, backend.coldColor.b, 0.45)
                 border.width: 1
 
@@ -207,6 +229,28 @@ Window {
                     anchors.horizontalCenter: parent.horizontalCenter
                     elide: Text.ElideRight
                     maximumLineCount: 1
+                }
+
+                Repeater {
+                    model: backend.fanSpeeds
+                    Text {
+                        required property var modelData
+                        width: 210
+                        horizontalAlignment: Text.AlignHCenter
+                        elide: Text.ElideRight
+                        text: modelData.label + ": " + (modelData.rpm < 0 ? qsTr("Unavailable") : modelData.rpm + " RPM")
+                        color: "#e2e8f0"
+                        font.pixelSize: 11
+                        font.features: { "tnum": 1 }
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                }
+                Text {
+                    visible: backend.fanSpeeds.length === 0
+                    text: qsTr("Fan speed unavailable")
+                    color: "#cbd5e1"
+                    font.pixelSize: 11
+                    anchors.horizontalCenter: parent.horizontalCenter
                 }
 
                 // Hint for user in cold blue accent

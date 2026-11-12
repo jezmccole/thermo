@@ -30,6 +30,30 @@ private slots:
         QCOMPARE(backend.currentColor(), QColor("#dc2626"));
     }
 
+    void fanSpeedsHandleLabelsZeroAndInvalidReadings() {
+        QTemporaryDir dir;
+        QVERIFY(QDir().mkpath(dir.path() + "/hwmon0"));
+        auto write = [&](const QString &name, const QByteArray &value) {
+            QFile file(dir.path() + "/hwmon0/" + name);
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write(value);
+        };
+        write("fan1_input", "3443\n");
+        write("fan1_label", "Right Side  \n");
+        write("fan2_input", "0\n");
+        write("fan3_input", "bad\n");
+        write("fan4_input", "-10\n");
+        auto fans = SensorManager::readFanSpeeds(dir.path());
+        QCOMPARE(fans.size(), 4);
+        QCOMPARE(fans[0].toMap()["label"].toString(), QString("Right Side"));
+        QCOMPARE(fans[0].toMap()["rpm"].toInt(), 3443);
+        QCOMPARE(fans[1].toMap()["label"].toString(), QString("Fan 2"));
+        QCOMPARE(fans[1].toMap()["rpm"].toInt(), 0);
+        QCOMPARE(fans[2].toMap()["rpm"].toInt(), -1);
+        QCOMPARE(fans[3].toMap()["rpm"].toInt(), -1);
+        QVERIFY(SensorManager::readFanSpeeds(dir.path() + "/missing").isEmpty());
+    }
+
     void sensorManagerFormatsAppleSmcLabels() {
         QCOMPARE(SensorManager::formatAppleSmcLabel("TC0P"), QString("Central Processor Proximity (TC0P)"));
         QCOMPARE(SensorManager::formatAppleSmcLabel("TC0C"), QString("CPU Core 0 (TC0C)"));

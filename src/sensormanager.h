@@ -4,6 +4,7 @@
 #include <QString>
 #include <QList>
 #include <QVariantMap>
+#include <QVariantList>
 
 struct SensorInfo {
     QString id;          // e.g. "applesmc:TC0P", "coretemp:Package id 0", "cpu_average"
@@ -22,6 +23,7 @@ public:
     explicit SensorManager(QObject *parent = nullptr);
 
     QList<SensorInfo> scanSensors();
+    static QVariantList readFanSpeeds(const QString &hwmonRoot = "/sys/class/hwmon");
     double readSensor(const QString &id);
     double readRawPath(const QString &path);
 

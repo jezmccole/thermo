@@ -21,6 +21,8 @@ Backend::Backend(QObject *parent)
         m_sensorId = m_sensorManager.defaultSensorId();
     }
 
+    m_fanSpeeds = SensorManager::readFanSpeeds();
+
     // Initial temperature read
     m_currentTemp = m_sensorManager.readSensor(m_sensorId);
 
@@ -116,6 +118,11 @@ QVariantList Backend::availableSensors() const {
 }
 
 void Backend::pollTemperature() {
+    const auto fans = SensorManager::readFanSpeeds();
+    if (fans != m_fanSpeeds) {
+        m_fanSpeeds = fans;
+        emit fanSpeedsChanged();
+    }
     double newTemp = m_sensorManager.readSensor(m_sensorId);
     if (std::abs(newTemp - m_currentTemp) > 0.05) {
         m_currentTemp = newTemp;

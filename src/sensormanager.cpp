@@ -236,3 +236,27 @@ QString SensorManager::sensorLabel(const QString &id) const {
     }
     return id;
 }
+
+QVariantList SensorManager::readFanSpeeds(const QString &hwmonRoot) {
+    QVariantList fans;
+    QDir root(hwmonRoot);
+    for (const QString &entry : root.entryList({"hwmon*"}, QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+        QDir device(root.filePath(entry));
+        for (const QString &input : device.entryList({"fan*_input"}, QDir::Files, QDir::Name)) {
+            QString base = input.chopped(6);
+            QFile labelFile(device.filePath(base + "_label"));
+            QString label;
+            if (labelFile.open(QIODevice::ReadOnly))
+                label = QString::fromUtf8(labelFile.readAll()).trimmed();
+            if (label.isEmpty())
+                label = QString("Fan %1").arg(base.mid(3));
+            QFile inputFile(device.filePath(input));
+            bool ok = false;
+            int rpm = -1;
+            if (inputFile.open(QIODevice::ReadOnly))
+                rpm = QString::fromUtf8(inputFile.readAll()).trimmed().toInt(&ok);
+            fans.append(QVariantMap{{"label", label}, {"rpm", ok && rpm >= 0 ? rpm : -1}});
+        }
+    }
+    return fans;
+}

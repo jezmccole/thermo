@@ -10,6 +10,7 @@ Sits quietly on the desktop behind all windows along the right edge of your scre
 - **Ultra-Minimal Footprint**: Only a few pixels wide when resting, completely unobtrusive and non-distracting.
 - **Organic Heat Gradient**: Cold blue (`#38BDF8`) through a muted neutral midpoint and orange to hot crimson (`#DC2626`), with matching blue outlines.
 - **Interactive Holographic Readout**: Hovering reveals a stationary frosted glass readout badge beside the rail. The rail never moves or expands on hover; a continuous hover area and brief exit delay keep the badge readable. Transparent areas allow desktop clicks through.
+- **Live Fan Speeds**: The smoked glass badge reports each available hardware fan in RPM, refreshed every 1.5 seconds. Missing readings are shown as unavailable.
 - **Draggable Position**: Click and drag the thermometer strip vertically along the edge of your screen to set your preferred resting position.
 - **MacBook Sensor Detection**: Autodetects all Apple SMC hardware sensors (`applesmc`) and CPU package sensors (`coretemp`). Defaults to **Central Processor Proximity (`TC0P`)**, with options for Average CPU temperature, System average, or individual sensors.
 - **Live Omarchy Theming**: Watches desktop accent and Hyprland window rounding live.
