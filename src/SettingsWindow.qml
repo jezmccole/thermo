@@ -309,8 +309,39 @@ ApplicationWindow {
 
                 Section {
                     title: qsTr("About Thermo")
-                    Label { text: qsTr("Created by Kairos Medical Informatics Ltd") }
-                    Description { text: qsTr("Version %1 • MIT licence").arg(Qt.application.version) }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: settingsWin.cardPadding
+                        Rectangle {
+                            Layout.preferredWidth: 112
+                            Layout.preferredHeight: 112
+                            Layout.alignment: Qt.AlignTop
+                            color: "white"
+                            radius: 6
+                            Image {
+                                objectName: "companyLogo"
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                source: "qrc:/assets/kairos-logo.png"
+                                fillMode: Image.PreserveAspectFit
+                                smooth: true
+                                Accessible.role: Accessible.Graphic
+                                Accessible.name: qsTr("Kairos Medical Informatics logo")
+                            }
+                        }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            Label { text: qsTr("Created by Kairos Medical Informatics Ltd") }
+                            Description { text: qsTr("Version %1 • MIT licence").arg(Qt.application.version) }
+                            Button {
+                                objectName: "companyWebsiteLink"
+                                text: "kairosmedical.co.uk"
+                                Accessible.name: qsTr("Visit the Kairos Medical Informatics website")
+                                onClicked: Qt.openUrlExternally("https://kairosmedical.co.uk/")
+                            }
+                        }
+                    }
                     Button { text: qsTr("View project on GitHub"); onClicked: Qt.openUrlExternally("https://github.com/jezmccole/thermo") }
                 }
             }
@@ -319,7 +350,7 @@ ApplicationWindow {
 
     footer: Pane {
         objectName: "settingsFooter"
-        leftPadding: Math.max(settingsWin.pagePadding, (width - 8 - 760) / 2)
+        leftPadding: Math.max(settingsWin.pagePadding, (settingsWin.width - 8 - 760) / 2)
         rightPadding: leftPadding + 8
         topPadding: 12
         bottomPadding: 12

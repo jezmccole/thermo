@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/">
+        <file alias="assets/kairos-logo.png">assets/kairos-logo.png</file>
         <file alias="Main.qml">Main.qml</file>
         <file alias="RailMarker.qml">RailMarker.qml</file>
         <file alias="DesktopThermometer.qml">DesktopThermometer.qml</file>

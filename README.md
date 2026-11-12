@@ -2,7 +2,7 @@
 
 A quiet desktop thermometer for Omarchy: glance at the rail, hover for a readable glass badge with temperature and fan speeds.
 
-**Created by Kairos Medical Informatics Ltd.** Open source, with contributions welcome.
+**Created by [Kairos Medical Informatics Ltd](https://kairosmedical.co.uk/).** Open source, with contributions welcome.
 
 ![Thermo glass badge showing a live temperature and fan speed](docs/thermo-badge.png)
 
@@ -122,6 +122,8 @@ Read the [product requirements](PRD.md) and [roadmap](ROADMAP.md) before startin
 
 ## Attribution and licence
 
-Created by **Kairos Medical Informatics Ltd**. Maintained at [jezmccole/thermo](https://github.com/jezmccole/thermo).
+<a href="https://kairosmedical.co.uk/"><img src="src/assets/kairos-logo.png" width="144" alt="Kairos Medical Informatics logo"></a>
+
+Created by **[Kairos Medical Informatics Ltd](https://kairosmedical.co.uk/)**. Maintained at [jezmccole/thermo](https://github.com/jezmccole/thermo).
 
 Released under the [MIT licence](LICENSE). Existing copyright and third-party notices are preserved, including the Omacut / Monologue template attribution.

@@ -328,6 +328,18 @@ private slots:
             lastBottom = item->y() + item->height();
         }
         QVERIFY(footer->height() > 0);
+        auto logo = window->findChild<QQuickItem*>("companyLogo");
+        QVERIFY(logo);
+        QTRY_COMPARE(logo->property("status").toInt(), 1); // Image.Ready: embedded asset decodes offline.
+        QVERIFY(window->findChild<QObject*>("companyWebsiteLink"));
+        if (fontSize == 12) {
+            QSaveFile updatedFont(configDir.path() + "/theme/shell.toml");
+            QVERIFY(updatedFont.open(QIODevice::WriteOnly));
+            updatedFont.write("[font]\nbase-size=18\n");
+            QVERIFY(updatedFont.commit());
+            QTRY_COMPARE(window->property("textScale").toDouble(), 1.5);
+            QCoreApplication::processEvents();
+        }
         QCOMPARE(warnings.count(), 0);
     }
 
