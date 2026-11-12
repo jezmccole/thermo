@@ -20,7 +20,7 @@ Completion: fixture-based tests cover failures and recovery; the interface never
 
 ## Companion fan rail — added alongside milestone 2
 
-Optional blue-only fan-speed rail, tightly attached to the temperature rail. Uses the first detected fan and its hardware-reported maximum RPM. Disabled by default; unavailable data is flagged. Both rails share hover and vertical movement.
+Optional blue-only fan-speed rail, tightly attached to the temperature rail. Uses the first detected fan and its hardware-reported maximum RPM. Disabled by default; unavailable data is flagged. Both rails share hover and vertical movement. Tiny vector fan/heat markers appear above the pair only when the companion rail is enabled.
 
 ## 3. Full Omarchy theme integration — delivered
 

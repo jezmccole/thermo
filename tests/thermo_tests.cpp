@@ -148,8 +148,16 @@ private slots:
         const auto x = rail->property("x");
         const auto width = rail->property("width");
         QVERIFY(fill->property("visible").toBool());
+        auto heatMarker = window->findChild<QObject*>("heatRailMarker");
+        auto fanMarker = window->findChild<QObject*>("fanRailMarker");
+        QVERIFY(heatMarker); QVERIFY(fanMarker);
+        QVERIFY(!heatMarker->property("visible").toBool());
+        QVERIFY(!fanMarker->property("visible").toBool());
         backend.setFanRailEnabled(true);
         QCoreApplication::processEvents();
+        QVERIFY(heatMarker->property("visible").toBool());
+        QVERIFY(fanMarker->property("visible").toBool());
+        QCOMPARE(window->property("topHitMargin").toInt(), 20);
         QCOMPARE(rail->property("x"), x);
         QVERIFY(window->findChild<QObject*>("fanRail")->property("visible").toBool());
         backend.setAppearanceMode("classic");

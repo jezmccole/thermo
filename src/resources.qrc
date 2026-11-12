@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file alias="Main.qml">Main.qml</file>
+        <file alias="RailMarker.qml">RailMarker.qml</file>
         <file alias="DesktopThermometer.qml">DesktopThermometer.qml</file>
         <file alias="SettingsWindow.qml">SettingsWindow.qml</file>
         <file alias="i18n/en.json">i18n/en.json</file>

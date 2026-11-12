@@ -11,7 +11,7 @@ A quiet desktop thermometer for Omarchy: glance at the rail, hover for a readabl
 - A stationary desktop-edge rail with a blue → neutral → orange → red temperature scale and blue outlines.
 - A smoked glass badge that stays open while hovering the rail, connecting gap, or badge.
 - Live hardware temperature and fan RPM, refreshed every 1.5 seconds.
-- Optional blue companion fan rail, sharing the temperature rail’s position and hover interaction. Enable it in Settings. It shows the first detected fan’s RPM relative to its reported maximum; missing readings or maximums are flagged rather than guessed.
+- Optional blue companion fan rail, sharing the temperature rail’s position and hover interaction. Enable it in Settings. Tiny fan and heat symbols identify the rails when both are visible. It shows the first detected fan’s RPM relative to its reported maximum; missing readings or maximums are flagged rather than guessed.
 - Click to open Settings; drag vertically to reposition. Default rail height: 127 pixels.
 - Apple SMC and CPU temperature detection, with a selectable sensor and Celsius/Fahrenheit display.
 - Optional login autostart. Follow Omarchy appearance adapts badge and Settings colours, readable text, borders, font size/family, and window rounding live. Classic Glass retains the original smoked glass palette.

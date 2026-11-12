@@ -26,11 +26,12 @@ Window {
 
     // A window mask also defines the Wayland input region. Expand it before
     // showing the badge, and retain it through the fade-out.
+    property int topHitMargin: backend.fanRailEnabled ? 20 : 8
     property rect inputRect: Qt.rect(
         readoutPill.visible || isHovered || isDragging ? Math.floor(railContainer.x + readoutPill.x - 5) : railContainer.x - 12,
-        Math.max(0, railContainer.y + Math.min(-8, readoutPill.visible ? readoutPill.y - 4 : -8)),
+        Math.max(0, railContainer.y + Math.min(-topHitMargin, readoutPill.visible ? readoutPill.y - 4 : -topHitMargin)),
         readoutPill.visible || isHovered || isDragging ? Math.ceil(readoutPill.width + 32 + railContainer.width) : railContainer.width + 16,
-        Math.max(railContainer.height + 8, readoutPill.visible ? readoutPill.y + readoutPill.height + 4 : 0) - Math.min(-8, readoutPill.visible ? readoutPill.y - 4 : -8))
+        Math.max(railContainer.height + 8, readoutPill.visible ? readoutPill.y + readoutPill.height + 4 : 0) - Math.min(-topHitMargin, readoutPill.visible ? readoutPill.y - 4 : -topHitMargin))
     onInputRectChanged: backend.setInputRegion(thermoWindow, inputRect)
     Component.onCompleted: backend.setInputRegion(thermoWindow, inputRect)
 
@@ -63,6 +64,14 @@ Window {
         // Fixed width: the thermometer scale NEVER moves or expands horizontally on hover
         width: backend.idleWidth
         height: backend.barHeight
+
+        RailMarker {
+            objectName: "heatRailMarker"
+            symbol: "heat"
+            visible: backend.fanRailEnabled
+            x: (railContainer.width - width) / 2
+            y: -15
+        }
 
         // Frosted glass background rail track with ice cold blue outline
         Rectangle {
@@ -127,6 +136,12 @@ Window {
         // Optional companion fan rail. Shares the rail's position and input area.
         Rectangle {
             objectName: "fanRail"
+            RailMarker {
+                objectName: "fanRailMarker"
+                symbol: "fan"
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: -15
+            }
             visible: backend.fanRailEnabled
             x: -10
             width: 6
@@ -385,7 +400,7 @@ Window {
             anchors.fill: parent
             anchors.leftMargin: -12
             anchors.rightMargin: -4
-            anchors.topMargin: -8
+            anchors.topMargin: -thermoWindow.topHitMargin
             anchors.bottomMargin: -8
             hoverEnabled: true
             cursorShape: isDragging ? Qt.ClosedHandCursor : (isHovered ? Qt.PointingHandCursor : Qt.ArrowCursor)
