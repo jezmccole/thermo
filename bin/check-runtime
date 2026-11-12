@@ -1,0 +1,56 @@
+#!/bin/sh
+# Isolated process/IPC smoke check; never contacts the user's running instance.
+set -eu
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+thermo_binary="$(realpath "${1:-$ROOT/build/thermo}")"
+thermo_check_dir="$(mktemp -d)"
+thermo_pid=""
+thermo_watchdog_pid=""
+cleanup() {
+    if [ -n "$thermo_watchdog_pid" ]; then kill "$thermo_watchdog_pid" 2>/dev/null || true; fi
+    if [ -n "$thermo_pid" ] && kill -0 "$thermo_pid" 2>/dev/null; then
+        kill "$thermo_pid" 2>/dev/null || true
+        wait "$thermo_pid" 2>/dev/null || true
+    fi
+    rm -rf "$thermo_check_dir"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+export TMPDIR="$thermo_check_dir" XDG_CONFIG_HOME="$thermo_check_dir/config" XDG_RUNTIME_DIR="$thermo_check_dir/runtime"
+export QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=basic QT_QUICK_BACKEND=software QT_IM_MODULE=compose
+export HYPRLAND_INSTANCE_SIGNATURE="" DBUS_SESSION_BUS_ADDRESS="unix:path=$thermo_check_dir/no-session-bus"
+mkdir -m700 "$XDG_RUNTIME_DIR"
+"$thermo_binary" quit
+"$thermo_binary" close
+"$thermo_binary" toggle
+[ ! -e "$XDG_CONFIG_HOME/thermo/config.json" ]
+"$thermo_binary" --background > "$thermo_check_dir/app.log" 2>&1 &
+thermo_pid=$!
+thermo_attempt=0
+while [ ! -S "$TMPDIR/thermo-ipc-$(id -u)" ] || [ ! -f "$XDG_CONFIG_HOME/autostart/thermo.desktop" ]; do
+    kill -0 "$thermo_pid"
+    thermo_attempt=$((thermo_attempt + 1))
+    if [ "$thermo_attempt" -ge 50 ]; then cat "$thermo_check_dir/app.log"; exit 1; fi
+    sleep 0.1
+done
+[ -f "$XDG_CONFIG_HOME/autostart/thermo.desktop" ]
+"$thermo_binary" --background
+"$thermo_binary" settings
+"$thermo_binary" close
+"$thermo_binary" toggle
+"$thermo_binary" close
+"$thermo_binary" quit
+# wait reaps the child; kill -0 alone may keep seeing an unreaped exit.
+(sleep 5; kill -KILL "$thermo_pid" 2>/dev/null || true) &
+thermo_watchdog_pid=$!
+if ! wait "$thermo_pid"; then
+    cat "$thermo_check_dir/app.log"
+    exit 1
+fi
+kill "$thermo_watchdog_pid" 2>/dev/null || true
+wait "$thermo_watchdog_pid" 2>/dev/null || true
+thermo_watchdog_pid=""
+thermo_pid=""
+[ -f "$XDG_CONFIG_HOME/thermo/config.json" ]
+"$thermo_binary" --json > "$thermo_check_dir/status.json"
+printf '%s\n' 'Isolated startup, autostart file, IPC controls, quit and JSON smoke checks passed.'

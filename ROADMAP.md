@@ -30,7 +30,7 @@ Optional blue-only fan-speed rail, tightly attached to the temperature rail. Use
 
 Completion: verify light and dark themes, low-contrast palettes, missing files, and live theme replacement. Hover geometry remains stable and existing preferences are preserved.
 
-## 4. Polished public release — next
+## 4. Polished public release — in progress
 
 - Validate dependencies, installation, upgrades, autostart, and uninstall on a clean supported environment.
 - Publish a versioned release with a reproducible Arch package and clear compatibility information; consider AUR publication after packaging is ready.
@@ -39,6 +39,8 @@ Completion: verify light and dark themes, low-contrast palettes, missing files, 
 - Establish an idle resource-use baseline and retain a lightweight footprint.
 
 Completion: a new user can follow the published instructions successfully; released artifacts correspond to a source tag; documented automated and manual checks pass. Wider hardware claims require testing on that hardware.
+
+Progress: contribution guidance, bug/feature templates, and an Arch container CI workflow are implemented. The runtime smoke check isolates the application socket and preferences. IPC commands now receive acknowledgements, explicit quit bypasses the Settings close veto, and control commands no longer start a new instance. Automated and manual release checks are separated in [the release checklist](docs/RELEASE-CHECKLIST.md). Public release tagging remains pending the checklist, including actual Omarchy login, upgrade, accessibility, and desktop-fit validation.
 
 ## 5. Temperature trends and history — planned
 

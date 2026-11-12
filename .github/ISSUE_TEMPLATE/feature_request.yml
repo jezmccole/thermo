@@ -1,0 +1,16 @@
+name: Feature request
+description: Suggest a focused improvement to Thermo.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested behaviour
+      description: Describe the simplest useful result and relevant hardware or desktop environment.
+    validations:
+      required: true

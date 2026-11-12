@@ -1,5 +1,6 @@
 #include <QCommandLineParser>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QIcon>
 #include <QJsonDocument>
@@ -56,7 +57,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    const QString socketName = QString("thermo-ipc-%1").arg(getuid());
+    const QString socketName = QDir::temp().filePath(QString("thermo-ipc-%1").arg(getuid()));
 
     // Check if another instance is already running
     QLocalSocket clientSocket;
@@ -77,8 +78,19 @@ int main(int argc, char *argv[]) {
         }
         clientSocket.flush();
         clientSocket.waitForBytesWritten(500);
-        return 0;
+        // Keep the connection alive until the server has received the command.
+        QElapsedTimer acknowledgement;
+        acknowledgement.start();
+        while (!clientSocket.canReadLine()) {
+            const int remaining = 1000 - acknowledgement.elapsed();
+            if (remaining <= 0 || !clientSocket.waitForReadyRead(remaining)) return 1;
+        }
+        return clientSocket.readLine().trimmed() == "OK" ? 0 : 1;
     }
+
+    // Control commands must not start a new application when none is running.
+    if (action == "quit" || action == "close" || action == "toggle")
+        return 0;
 
     // No existing instance; we are the primary server
     QLocalServer::removeServer(socketName);
@@ -98,23 +110,26 @@ int main(int argc, char *argv[]) {
     Backend backend;
 
     // Connect IPC server
-    QObject::connect(&server, &QLocalServer::newConnection, [&server, &backend, &app] {
+    QObject::connect(&server, &QLocalServer::newConnection, [&server, &backend] {
         while (QLocalSocket *client = server.nextPendingConnection()) {
-            QObject::connect(client, &QLocalSocket::readyRead, [client, &backend, &app] {
-                const QString msg = QString::fromUtf8(client->readAll()).trimmed();
-                if (msg == "SHOW_SETTINGS") {
-                    backend.openSettings();
-                } else if (msg == "CLOSE_SETTINGS") {
-                    backend.closeSettings();
-                } else if (msg == "TOGGLE_SETTINGS") {
-                    if (backend.settingsVisible())
-                        backend.closeSettings();
-                    else
-                        backend.openSettings();
-                } else if (msg == "QUIT") {
-                    backend.quitApp();
+            const auto dispatch = [client, &backend] {
+                while (client->canReadLine()) {
+                    const QString msg = QString::fromUtf8(client->readLine()).trimmed();
+                    client->write("OK\n");
+                    client->flush();
+                    if (msg == "SHOW_SETTINGS") backend.openSettings();
+                    else if (msg == "CLOSE_SETTINGS") backend.closeSettings();
+                    else if (msg == "TOGGLE_SETTINGS") {
+                        if (backend.settingsVisible()) backend.closeSettings();
+                        else backend.openSettings();
+                    } else if (msg == "QUIT") backend.quitApp();
                 }
-            });
+            };
+            QObject::connect(client, &QLocalSocket::readyRead, dispatch);
+            QObject::connect(client, &QLocalSocket::disconnected, client, &QObject::deleteLater);
+            // Data may already have arrived before readyRead was connected.
+            dispatch();
+            if (client->state() == QLocalSocket::UnconnectedState) client->deleteLater();
         }
     });
 

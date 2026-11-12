@@ -64,7 +64,7 @@ thermo --version
 thermo quit            # Quit the running instance
 ```
 
-`--json` does not currently include saved configuration or fan readings. Each temperature sensor now includes `status` (`live` or `unavailable`) and `error` (empty, `missing`, `read_failed`, or `no_valid_sources`). `tempC` is a number for a valid reading and `null` otherwise; consumers must handle `null`. This one-shot snapshot has no historical reading to mark stale. A disappeared channel is absent from the snapshot; an unreadable channel that is still discoverable remains listed. `close`, `toggle`, and `quit` should be used with an existing running instance; their no-instance behaviour still needs improvement.
+`--json` does not currently include saved configuration or fan readings. Each temperature sensor now includes `status` (`live` or `unavailable`) and `error` (empty, `missing`, `read_failed`, or `no_valid_sources`). `tempC` is a number for a valid reading and `null` otherwise; consumers must handle `null`. This one-shot snapshot has no historical reading to mark stale. A disappeared channel is absent from the snapshot; an unreadable channel that is still discoverable remains listed. `close`, `toggle`, and `quit` exit quietly if no instance is running.
 
 To restart a running instance, run `thermo quit`, wait for it to exit, then run `thermo --background`.
 
@@ -103,13 +103,14 @@ If you previously installed a separate copy in `~/.local/bin`, remove that copy 
 ```bash
 ./bin/build
 ./bin/test
+./bin/check-runtime
 ```
 
 Tests run offscreen with a temporary configuration directory. Hardware-independent fan fixtures cover labels, stopped fans, and invalid values; temperature fixtures cover failures, recovery, composite averages, and JSON availability without requiring host sensors. Hover, placement, and rendering require manual Wayland verification.
 
 Report bugs through [GitHub issues](https://github.com/jezmccole/thermo/issues), including Thermo/Omarchy versions, hardware, sensor driver, reproduction steps, and relevant logs. Check screenshots and logs for personal information before sharing. Pull requests are welcome: explain the problem, keep the change focused, and include relevant validation.
 
-Read the [product requirements](PRD.md) and [roadmap](ROADMAP.md) before starting a larger feature. Full contribution templates and automated checks are planned for release preparation.
+Read the [product requirements](PRD.md) and [roadmap](ROADMAP.md) before starting a larger feature. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow, manual checks, and pull-request guidance. GitHub Actions builds and tests in a fresh Arch container and checks package installation, reinstall, and removal. Its artifacts are development packages; [release-readiness checks](docs/RELEASE-CHECKLIST.md) remain explicit.
 
 ## Attribution and licence
 

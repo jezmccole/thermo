@@ -1,0 +1,41 @@
+name: Build, test and package
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  arch:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    timeout-minutes: 20
+    steps:
+      - name: Install current Arch dependencies
+        run: pacman -Syu --noconfirm --needed git base-devel qt6-base qt6-declarative qt6-wayland layer-shell-qt python
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build and test as a regular user
+        run: |
+          useradd --create-home builder
+          cp -a "$GITHUB_WORKSPACE" /tmp/thermo-ci
+          chown -R builder:builder /tmp/thermo-ci
+          runuser -u builder -- sh -c 'cd /tmp/thermo-ci && ./bin/build && ./bin/test && ./bin/check-runtime && cd pkgbuild && makepkg -f'
+      - name: Validate package installation, reinstall and removal
+        run: |
+          set -- /tmp/thermo-ci/pkgbuild/thermo-[0-9]*.pkg.tar.zst
+          pacman -U --noconfirm "$@"
+          runuser -u builder -- /tmp/thermo-ci/bin/check-runtime /usr/bin/thermo
+          pacman -U --noconfirm "$@"
+          QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=basic /usr/bin/thermo --version
+          pacman -R --noconfirm thermo
+          test ! -e /usr/bin/thermo
+      - name: Collect package artifacts
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp /tmp/thermo-ci/pkgbuild/thermo-[0-9]*.pkg.tar.zst "$GITHUB_WORKSPACE/out/"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: thermo-arch-x86_64
+          path: out/*.pkg.tar.zst
+          retention-days: 14

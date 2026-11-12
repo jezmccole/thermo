@@ -280,7 +280,9 @@ void Backend::closeSettings() {
 
 void Backend::quitApp() {
     saveConfig();
-    QCoreApplication::quit();
+    // Settings vetoes ordinary window closes to keep the rail alive. An
+    // explicit application quit must exit even after Settings has been opened.
+    QCoreApplication::exit(0);
 }
 
 void Backend::syncAutostartDesktopFile() {

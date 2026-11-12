@@ -1,0 +1,21 @@
+name: Bug report
+description: Report a reproducible problem with Thermo.
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Thermo version/commit, Omarchy and Hyprland versions, hardware, sensor driver, display scale, and installation method.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps, expected result and actual result
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or screenshots
+      description: Crop screenshots and remove personal information before sharing. Include whether Classic Glass or Follow Omarchy is selected.
