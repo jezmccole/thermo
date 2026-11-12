@@ -117,9 +117,9 @@ ApplicationWindow {
             ColumnLayout {
                 id: settingsColumn
                 objectName: "settingsColumn"
-                x: settingsWin.pagePadding
+                x: Math.max(settingsWin.pagePadding, (settingsPage.width - 8 - width) / 2)
                 y: settingsWin.pagePadding
-                width: settingsPage.width - 2 * settingsWin.pagePadding - 8
+                width: Math.min(760, settingsPage.width - 2 * settingsWin.pagePadding - 8)
                 spacing: Math.round(20 * Math.min(settingsWin.textScale, 1.25))
 
                 Section {
@@ -319,8 +319,8 @@ ApplicationWindow {
 
     footer: Pane {
         objectName: "settingsFooter"
-        leftPadding: settingsWin.pagePadding
-        rightPadding: settingsWin.pagePadding + 8
+        leftPadding: Math.max(settingsWin.pagePadding, (width - 8 - 760) / 2)
+        rightPadding: leftPadding + 8
         topPadding: 12
         bottomPadding: 12
         background: Rectangle { color: settingsWin.color }

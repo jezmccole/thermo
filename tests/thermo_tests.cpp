@@ -282,6 +282,7 @@ private slots:
         QTest::addColumn<int>("fontSize");
         QTest::addColumn<bool>("light");
         QTest::newRow("narrow") << 520 << 560 << 12 << false;
+        QTest::newRow("wide-tiled") << 1280 << 800 << 12 << false;
         QTest::newRow("narrow-large-font") << 520 << 560 << 18 << false;
         QTest::newRow("light-large-font") << 640 << 720 << 18 << true;
     }
@@ -314,7 +315,8 @@ private slots:
         auto footer = window->findChild<QQuickItem*>("settingsFooter");
         QVERIFY(column); QVERIFY(scroll); QVERIFY(footer);
         QTRY_VERIFY(column->height() > scroll->height());
-        QCOMPARE(column->x(), double(window->property("pagePadding").toInt()));
+        QTRY_VERIFY(column->width() <= 760);
+        QTRY_COMPARE(column->x(), std::max(double(window->property("pagePadding").toInt()), (window->width() - 8 - column->width()) / 2));
         QVERIFY(column->x() >= 24);
         QTRY_VERIFY(column->x() + column->width() <= window->width() - 24);
         qreal lastBottom = 0;

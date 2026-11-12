@@ -76,7 +76,7 @@ Choose **Primary display (automatic)** or a named monitor under Desktop placemen
 
 Both screen edges are supported. The temperature rail stays closest to the edge; the companion fan rail and badge face inward. Hover never moves the rails. Sizes use logical pixels so Qt applies display scaling automatically. The displayed height and vertical position are clamped to the available space while retaining your saved size and position; dragging saves a new position.
 
-Settings has consistent page/card padding, grouped fields, and a scrolling page with persistent Close/Quit buttons. Physical multi-monitor hotplug and additional hardware/display-scale combinations still need manual validation.
+Settings has consistent page/card padding, grouped fields, and a scrolling page with persistent Close/Quit buttons. Content is centered and capped at 760 logical pixels in wide or tiled windows. Physical multi-monitor hotplug and additional hardware/display-scale combinations still need manual validation.
 
 ## Configuration and autostart
 
