@@ -1,4 +1,8 @@
 #include <QDir>
+#include <QJsonDocument>
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
+#include <cmath>
 #include <QFile>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -12,14 +16,152 @@ class ThermoTests : public QObject {
     Q_OBJECT
 
     QTemporaryDir configDir;
+    QTemporaryDir hwmonRoot;
+    void writeReading(const QString &root, const QString &name, const QByteArray &value) {
+        QVERIFY(QDir().mkpath(root + "/hwmon0"));
+        QFile file(root + "/hwmon0/" + name);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write(value), value.size());
+    }
+    void setupCpu(const QString &root) {
+        writeReading(root, "name", "coretemp\n");
+        writeReading(root, "temp1_label", "Package id 0\n");
+        writeReading(root, "temp1_input", "50000\n");
+    }
 private slots:
     void initTestCase() {
         QVERIFY(configDir.isValid());
+        QVERIFY(hwmonRoot.isValid());
+        setupCpu(hwmonRoot.path());
         qputenv("XDG_CONFIG_HOME", configDir.path().toUtf8());
     }
 
+    void init() {
+        QDir(configDir.path()).removeRecursively();
+        QVERIFY(QDir().mkpath(configDir.path()));
+    }
+
+    void snapshotsExcludeInvalidValuesAndRecover() {
+        QTemporaryDir root;
+        setupCpu(root.path());
+        SensorManager sm(nullptr, root.path());
+        QCOMPARE(sm.readSensor("cpu_average").value(), 50.0);
+        writeReading(root.path(), "temp1_input", "70000\n");
+        sm.scanSensors();
+        QCOMPARE(sm.readSensor("cpu_average").value(), 70.0);
+        writeReading(root.path(), "temp2_label", "Core 0\n");
+        writeReading(root.path(), "temp2_input", "0\n");
+        sm.scanSensors();
+        QCOMPARE(sm.readSensor("cpu_average").value(), 35.0);
+        for (const QByteArray &value : {QByteArray("bad"), QByteArray("nan"), QByteArray("inf"), QByteArray("-127000"), QByteArray("141000"), QByteArray("")}) {
+            writeReading(root.path(), "temp1_input", value);
+            sm.scanSensors();
+            QVERIFY(!sm.readSensor("coretemp:Package id 0"));
+            QCOMPARE(sm.readSensor("cpu_average").value(), 0.0);
+            const auto json = sm.snapshotJson()["sensors"].toObject()["coretemp:Package id 0"].toObject();
+            QVERIFY(json["tempC"].isNull());
+            QCOMPARE(json["status"].toString(), QString("unavailable"));
+            QCOMPARE(json["error"].toString(), QString("read_failed"));
+        }
+        writeReading(root.path(), "temp1_input", "65000\n");
+        writeReading(root.path(), "temp1_fault", "1\n");
+        sm.scanSensors();
+        QVERIFY(!sm.readSensor("coretemp:Package id 0"));
+        writeReading(root.path(), "temp1_fault", "0\n");
+        sm.scanSensors();
+        QCOMPARE(sm.readSensor("coretemp:Package id 0").value(), 65.0);
+        QVERIFY(QFile::remove(root.path() + "/hwmon0/temp1_input"));
+        QVERIFY(QFile::remove(root.path() + "/hwmon0/temp2_input"));
+        sm.scanSensors();
+        QVERIFY(!sm.readSensor("cpu_average"));
+        QVERIFY(!sm.readSensor("all_average"));
+        QCOMPARE(sm.sensorError("coretemp:Package id 0"), QString("missing"));
+        QVERIFY(!sm.readSensor("unknown"));
+    }
+
+    void backendFlagsFailureMissingAndRecovery() {
+        QTemporaryDir root;
+        setupCpu(root.path());
+        Backend backend(nullptr, root.path());
+        QCOMPARE(backend.temperatureStatus(), QString("live"));
+        QCOMPARE(backend.currentTemperature(), 50.0);
+        QVERIFY(!backend.lastReadingAt().isEmpty());
+        writeReading(root.path(), "temp1_input", "bad");
+        backend.refreshSensors();
+        QCOMPARE(backend.temperatureStatus(), QString("stale"));
+        QVERIFY(backend.temperatureWarning().contains("failed"));
+        QCOMPARE(backend.currentTemperature(), 50.0);
+        QCOMPARE(backend.currentColor(), QColor("#94a3b8"));
+        QVERIFY(QFile::remove(root.path() + "/hwmon0/temp1_input"));
+        backend.refreshSensors();
+        QVERIFY(backend.temperatureWarning().contains("missing"));
+        backend.setSensorId("unknown");
+        QCOMPARE(backend.temperatureStatus(), QString("unavailable"));
+        QVERIFY(std::isnan(backend.currentTemperature()));
+        QCOMPARE(backend.formattedTemperature(), QString("Unavailable"));
+        QCOMPARE(backend.normalizedTemperature(), 0.0);
+        QVERIFY(backend.lastReadingAt().isEmpty());
+        backend.setSensorId("coretemp:Package id 0");
+        QCOMPARE(backend.temperatureStatus(), QString("unavailable"));
+        writeReading(root.path(), "temp1_input", "63000\n");
+        backend.refreshSensors();
+        QCOMPARE(backend.temperatureStatus(), QString("live"));
+        QCOMPARE(backend.currentTemperature(), 63.0);
+        QVERIFY(backend.temperatureWarning().isEmpty());
+        backend.setUnit("F");
+        QCOMPARE(backend.formattedTemperature(), QString("145.4°F"));
+        // Rediscovery tolerates hwmon numbering changes.
+        QVERIFY(QDir(root.path()).rename("hwmon0", "hwmon7"));
+        backend.refreshSensors();
+        QCOMPARE(backend.temperatureStatus(), QString("live"));
+        QCOMPARE(backend.currentTemperature(), 63.0);
+    }
+
+    void emptyHardwareStartsUnavailable() {
+        QTemporaryDir root;
+        Backend backend(nullptr, root.path());
+        QCOMPARE(backend.temperatureStatus(), QString("unavailable"));
+        QVERIFY(backend.temperatureWarning().contains("No valid"));
+        QVERIFY(std::isnan(backend.currentTemperature()));
+        SensorManager sm(nullptr, root.path());
+        const auto json = sm.snapshotJson()["sensors"].toObject();
+        QVERIFY(json["cpu_average"].toObject()["tempC"].isNull());
+        QCOMPARE(json["cpu_average"].toObject()["error"].toString(), QString("no_valid_sources"));
+    }
+
+    void railStaysFixedAndFlagsReadFailures() {
+        QTemporaryDir root;
+        setupCpu(root.path());
+        Backend backend(nullptr, root.path());
+        Theme theme(root.path());
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        engine.rootContext()->setContextProperty("theme", &theme);
+        engine.load(QUrl("qrc:/DesktopThermometer.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto window = engine.rootObjects().first();
+        auto rail = window->findChild<QObject*>("temperatureRail");
+        auto fill = window->findChild<QObject*>("temperatureFill");
+        QVERIFY(rail); QVERIFY(fill);
+        QTRY_VERIFY(rail->property("x").toDouble() > 0);
+        const auto x = rail->property("x");
+        const auto width = rail->property("width");
+        QVERIFY(fill->property("visible").toBool());
+        window->setProperty("isHovered", true);
+        writeReading(root.path(), "temp1_input", "bad");
+        backend.refreshSensors();
+        QCoreApplication::processEvents();
+        QVERIFY(!fill->property("visible").toBool());
+        QCOMPARE(rail->property("x"), x);
+        QCOMPARE(rail->property("width"), width);
+        writeReading(root.path(), "temp1_input", "60000\n");
+        backend.refreshSensors();
+        QVERIFY(fill->property("visible").toBool());
+        QCOMPARE(rail->property("x"), x);
+    }
+
     void compactDefaultsAndColorEndpoints() {
-        Backend backend;
+        Backend backend(nullptr, hwmonRoot.path());
         QCOMPARE(backend.barHeight(), 127);
         backend.setBarHeight(127);
         QCOMPARE(backend.barHeight(), 127);
@@ -62,7 +204,7 @@ private slots:
     }
 
     void sensorManagerScansSensors() {
-        SensorManager sm;
+        SensorManager sm(nullptr, hwmonRoot.path());
         const auto sensors = sm.scanSensors();
         QVERIFY(!sensors.isEmpty());
 
@@ -76,7 +218,7 @@ private slots:
     }
 
     void backendTemperatureNormalization() {
-        Backend backend;
+        Backend backend(nullptr, hwmonRoot.path());
         backend.setTemperatureRange(20.0, 100.0);
         QCOMPARE(backend.minTemperature(), 20.0);
         QCOMPARE(backend.maxTemperature(), 100.0);
@@ -87,7 +229,7 @@ private slots:
     }
 
     void backendColorGradients() {
-        Backend backend;
+        Backend backend(nullptr, hwmonRoot.path());
         backend.setTemperatureRange(0.0, 100.0);
 
         // Every sensor reading produces a valid display color.
@@ -99,7 +241,7 @@ private slots:
     }
 
     void backendAppearanceAndPositioning() {
-        Backend backend;
+        Backend backend(nullptr, hwmonRoot.path());
         backend.setIdleWidth(6);
         QCOMPARE(backend.idleWidth(), 6);
 

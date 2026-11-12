@@ -10,7 +10,7 @@ The initial audience is Omarchy users, with verified behaviour currently limited
 
 The shipped implementation provides a fixed right-edge rail, a stable hover badge with a smoked glass finish, selectable hardware temperature, fan RPM, Celsius/Fahrenheit, vertical dragging, Settings, and login autostart. The default height is 127 pixels. Settings uses the Omarchy accent and window rounding; the badge retains a fixed palette.
 
-Temperature failure handling is incomplete: some paths show stale or fallback values. The following trustworthy-data requirements are targets, not claims about the current implementation.
+Temperature polling uses fresh snapshots. Missing and faulty selected sensors are flagged explicitly; a real earlier reading is marked stale, and no prior reading means unavailable. The rail shows an amber outline with no temperature fill during failure. Standalone JSON reports unavailable values as null with status/error metadata.
 
 ## Experience requirements and acceptance criteria
 
@@ -18,7 +18,7 @@ Temperature failure handling is incomplete: some paths show stale or fallback va
 | --- | --- | --- | --- |
 | Ambient display | Remain unobtrusive behind normal windows | Hover changes neither rail position nor width; transparent areas do not block unrelated desktop interaction | Implemented; further regression coverage needed |
 | Readout | Remain readable and easy to reach | Badge stays open over rail, connecting gap, and badge; sensor updates do not shift it | Implemented and manually checked |
-| Measurements | Clearly distinguish readings from failures | Missing, invalid, disconnected, and stale temperature data are identified; no invented temperature is displayed | Next milestone |
+| Measurements | Clearly distinguish readings from failures | Missing, invalid, disconnected, and stale temperature data are identified; no invented temperature is displayed | Implemented with fixture tests |
 | Fan reporting | Report available hardware fans without controlling them | Each discovered fan has a label and RPM; zero is valid; invalid or absent data is unavailable | Implemented with fixture tests |
 | Theme integration | Follow Omarchy while preserving thermal meaning | Theme changes update surfaces, text, borders, and typography without restart; Classic Glass remains selectable; temperature remains blue-to-red | Planned |
 | Accessibility | Support legible and accessible inspection | Maintain readable contrast and allow keyboard access and reduced motion | Planned; not yet audited |

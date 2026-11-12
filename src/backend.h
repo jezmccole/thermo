@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QColor>
+#include <QDateTime>
+#include <limits>
 #include <QObject>
 #include <QString>
 #include <QTimer>
@@ -12,6 +14,9 @@
 class Backend : public QObject {
     Q_OBJECT
 
+    Q_PROPERTY(QString temperatureStatus READ temperatureStatus NOTIFY temperatureChanged)
+    Q_PROPERTY(QString temperatureWarning READ temperatureWarning NOTIFY temperatureChanged)
+    Q_PROPERTY(QString lastReadingAt READ lastReadingAt NOTIFY temperatureChanged)
     Q_PROPERTY(double currentTemperature READ currentTemperature NOTIFY temperatureChanged)
     Q_PROPERTY(double minTemperature READ minTemperature NOTIFY rangeChanged)
     Q_PROPERTY(double maxTemperature READ maxTemperature NOTIFY rangeChanged)
@@ -38,9 +43,12 @@ class Backend : public QObject {
     Q_PROPERTY(bool settingsVisible READ settingsVisible NOTIFY settingsVisibilityChanged)
 
 public:
-    explicit Backend(QObject *parent = nullptr);
+    explicit Backend(QObject *parent = nullptr, const QString &hwmonRoot = "/sys/class/hwmon");
     ~Backend() override;
 
+    QString temperatureStatus() const { return m_temperatureStatus; }
+    QString temperatureWarning() const;
+    QString lastReadingAt() const { return m_lastReadingAt.toString(Qt::ISODate); }
     double currentTemperature() const { return m_currentTemp; }
     double minTemperature() const { return m_minTemp; }
     double maxTemperature() const { return m_maxTemp; }
@@ -108,7 +116,11 @@ private:
     QList<SensorInfo> m_sensors;
     QVariantList m_fanSpeeds;
     QString m_sensorId;
-    double m_currentTemp = 45.0; // In Celsius
+    double m_currentTemp = std::numeric_limits<double>::quiet_NaN();
+    QString m_temperatureStatus = "unavailable";
+    QString m_temperatureError;
+    QDateTime m_lastReadingAt;
+    QString m_hwmonRoot;
     double m_minTemp = 30.0;
     double m_maxTemp = 100.0;
 

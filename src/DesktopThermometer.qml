@@ -21,9 +21,9 @@ Window {
     // showing the badge, and retain it through the fade-out.
     property rect inputRect: Qt.rect(
         readoutPill.visible || isHovered || isDragging ? Math.floor(railContainer.x + readoutPill.x - 5) : railContainer.x - 12,
-        Math.max(0, railContainer.y - 8),
+        Math.max(0, railContainer.y + Math.min(-8, readoutPill.visible ? readoutPill.y - 4 : -8)),
         readoutPill.visible || isHovered || isDragging ? Math.ceil(readoutPill.width + 32 + railContainer.width) : railContainer.width + 16,
-        railContainer.height + 16)
+        Math.max(railContainer.height + 8, readoutPill.visible ? readoutPill.y + readoutPill.height + 4 : 0) - Math.min(-8, readoutPill.visible ? readoutPill.y - 4 : -8))
     onInputRectChanged: backend.setInputRegion(thermoWindow, inputRect)
     Component.onCompleted: backend.setInputRegion(thermoWindow, inputRect)
 
@@ -48,6 +48,7 @@ Window {
 
     Item {
         id: railContainer
+        objectName: "temperatureRail"
         anchors.right: parent.right
         anchors.rightMargin: 2
         y: backend.railY
@@ -62,12 +63,14 @@ Window {
             anchors.fill: parent
             radius: width / 2
             color: "#d0141720"
-            border.color: Qt.rgba(backend.coldColor.r, backend.coldColor.g, backend.coldColor.b, 0.45) // Ice cold blue outline
+            border.color: backend.temperatureStatus === "live" ? Qt.rgba(backend.coldColor.r, backend.coldColor.g, backend.coldColor.b, 0.45) : "#fbbf24"
             border.width: 1
 
             // Liquid temperature column filling from bottom
             Item {
                 id: fillClip
+                objectName: "temperatureFill"
+                visible: backend.temperatureStatus === "live"
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
@@ -185,6 +188,7 @@ Window {
 
             Column {
                 id: pillContent
+                width: 224
                 anchors.centerIn: parent
                 spacing: 3
 
@@ -212,7 +216,7 @@ Window {
 
                     // Bold numerical temperature readout
                     Text {
-                        text: backend.formattedTemperature
+                        text: backend.formattedTemperature + (backend.temperatureStatus === "stale" ? " *" : "")
                         color: "#f8fafc"
                         font.pixelSize: 16
                         font.weight: Font.DemiBold
@@ -220,9 +224,22 @@ Window {
                     }
                 }
 
+                Text {
+                    text: backend.temperatureWarning
+                    visible: text.length > 0
+                    width: 224
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#fbbf24"
+                    font.pixelSize: 11
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+
                 // Sensor name / label
                 Text {
                     text: backend.sensorLabel
+                    width: 224
+                    horizontalAlignment: Text.AlignHCenter
                     color: "#94a3b8"
                     font.pixelSize: 10
                     font.weight: Font.Medium

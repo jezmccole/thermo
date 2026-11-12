@@ -1,13 +1,14 @@
 #include "sensormanager.h"
 
 #include <QDir>
+#include <QJsonValue>
 #include <QFile>
 #include <QFileInfo>
 #include <QTextStream>
 #include <cmath>
 
-SensorManager::SensorManager(QObject *parent)
-    : QObject(parent) {
+SensorManager::SensorManager(QObject *parent, const QString &hwmonRoot)
+    : QObject(parent), m_hwmonRoot(hwmonRoot) {
     scanSensors();
 }
 
@@ -34,16 +35,23 @@ QString SensorManager::formatAppleSmcLabel(const QString &code) {
     return QString("Apple SMC %1").arg(code);
 }
 
-double SensorManager::readRawPath(const QString &path) {
+std::optional<double> SensorManager::readRawPath(const QString &path) {
+    QFile faultFile(path.chopped(6) + "_fault");
+    if (faultFile.exists()) {
+        if (!faultFile.open(QIODevice::ReadOnly)) return std::nullopt;
+        bool faultOk = false;
+        const int fault = QString::fromUtf8(faultFile.readAll()).trimmed().toInt(&faultOk);
+        if (!faultOk || fault != 0) return std::nullopt;
+    }
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
-        return -999.0;
+        return std::nullopt;
 
     QTextStream stream(&file);
     bool ok = false;
     double val = stream.readLine().trimmed().toDouble(&ok);
-    if (!ok)
-        return -999.0;
+    if (!ok || !std::isfinite(val) || val < -20000 || val > 140000)
+        return std::nullopt;
 
     // hwmon reports in millidegrees Celsius
     return val / 1000.0;
@@ -59,7 +67,7 @@ QList<SensorInfo> SensorManager::scanSensors() {
     cpuAvg.driver = "virtual";
     cpuAvg.isCpu = true;
     cpuAvg.isDefault = false;
-    cpuAvg.currentTemp = 0.0;
+    cpuAvg.currentTemp = std::nullopt;
     list.append(cpuAvg);
 
     SensorInfo allAvg;
@@ -68,11 +76,11 @@ QList<SensorInfo> SensorManager::scanSensors() {
     allAvg.driver = "virtual";
     allAvg.isCpu = false;
     allAvg.isDefault = false;
-    allAvg.currentTemp = 0.0;
+    allAvg.currentTemp = std::nullopt;
     list.append(allAvg);
 
     // 2. Scan /sys/class/hwmon
-    QDir hwmonDir("/sys/class/hwmon");
+    QDir hwmonDir(m_hwmonRoot);
     QStringList hwmons = hwmonDir.entryList(QStringList() << "hwmon*", QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
 
     for (const QString &hwEntry : hwmons) {
@@ -90,11 +98,8 @@ QList<SensorInfo> SensorManager::scanSensors() {
 
         for (const QString &inFile : inputs) {
             QString inPath = dir.filePath(inFile);
-            double temp = readRawPath(inPath);
-
-            // Filter out disconnected sensors (-127°C, etc.)
-            if (temp < -20.0 || temp > 140.0)
-                continue;
+            const auto temp = readRawPath(inPath);
+            // Keep faulty channels discoverable so the UI can flag them.
 
             // Read label if available
             QString baseName = inFile;
@@ -142,68 +147,54 @@ QList<SensorInfo> SensorManager::scanSensors() {
     // Compute live values for the virtual sensors
     for (int i = 0; i < m_cachedSensors.size(); ++i) {
         if (m_cachedSensors[i].id == "cpu_average") {
-            m_cachedSensors[i].currentTemp = calculateCpuAverage();
+            m_cachedSensors[i].currentTemp = calculateAverage(true);
         } else if (m_cachedSensors[i].id == "all_average") {
-            m_cachedSensors[i].currentTemp = calculateAllAverage();
+            m_cachedSensors[i].currentTemp = calculateAverage(false);
         }
     }
 
     return m_cachedSensors;
 }
 
-double SensorManager::calculateCpuAverage() {
-    double sum = 0.0;
+std::optional<double> SensorManager::calculateAverage(bool cpuOnly) const {
+    double sum = 0;
     int count = 0;
-
-    for (const SensorInfo &s : m_cachedSensors) {
-        if (s.driver != "virtual" && s.isCpu && s.currentTemp > 0.0 && s.currentTemp < 130.0) {
-            sum += s.currentTemp;
-            count++;
+    for (const auto &sensor : m_cachedSensors) {
+        if (sensor.driver != "virtual" && (!cpuOnly || sensor.isCpu) && sensor.currentTemp) {
+            sum += *sensor.currentTemp;
+            ++count;
         }
     }
-
-    return count > 0 ? (sum / count) : 45.0;
+    return count ? std::optional<double>(sum / count) : std::nullopt;
 }
 
-double SensorManager::calculateAllAverage() {
-    double sum = 0.0;
-    int count = 0;
-
-    for (const SensorInfo &s : m_cachedSensors) {
-        if (s.driver != "virtual" && s.currentTemp > 0.0 && s.currentTemp < 130.0) {
-            sum += s.currentTemp;
-            count++;
-        }
-    }
-
-    return count > 0 ? (sum / count) : 40.0;
+std::optional<double> SensorManager::readSensor(const QString &id) {
+    // Consumers explicitly scan once per poll; all values share that snapshot.
+    for (const auto &sensor : m_cachedSensors)
+        if (sensor.id == id)
+            return sensor.currentTemp;
+    return std::nullopt;
 }
 
-double SensorManager::readSensor(const QString &id) {
-    if (id == "cpu_average")
-        return calculateCpuAverage();
-    if (id == "all_average")
-        return calculateAllAverage();
-
-    for (const SensorInfo &s : m_cachedSensors) {
-        if (s.id == id) {
-            if (!s.inputPath.isEmpty()) {
-                double val = readRawPath(s.inputPath);
-                if (val > -20.0 && val < 140.0)
-                    return val;
-            }
-            return s.currentTemp;
-        }
+QString SensorManager::sensorError(const QString &id) const {
+    for (const auto &sensor : m_cachedSensors) {
+        if (sensor.id != id) continue;
+        if (sensor.currentTemp) return {};
+        return sensor.driver == "virtual" ? "no_valid_sources" : "read_failed";
     }
+    return "missing";
+}
 
-    // If sensor not cached, rescan
-    scanSensors();
-    for (const SensorInfo &s : m_cachedSensors) {
-        if (s.id == id && !s.inputPath.isEmpty())
-            return readRawPath(s.inputPath);
+QJsonObject SensorManager::snapshotJson() const {
+    QJsonObject sensors;
+    for (const auto &sensor : m_cachedSensors) {
+        sensors[sensor.id] = QJsonObject{
+            {"label", sensor.label}, {"driver", sensor.driver}, {"isCpu", sensor.isCpu},
+            {"tempC", sensor.currentTemp ? QJsonValue(*sensor.currentTemp) : QJsonValue(QJsonValue::Null)},
+            {"status", sensor.currentTemp ? "live" : "unavailable"},
+            {"error", sensorError(sensor.id)}};
     }
-
-    return 50.0;
+    return QJsonObject{{"defaultSensor", defaultSensorId()}, {"sensors", sensors}};
 }
 
 QString SensorManager::defaultSensorId() const {

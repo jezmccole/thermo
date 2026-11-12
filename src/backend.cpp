@@ -10,8 +10,8 @@
 #include <algorithm>
 #include <cmath>
 
-Backend::Backend(QObject *parent)
-    : QObject(parent),
+Backend::Backend(QObject *parent, const QString &hwmonRoot)
+    : QObject(parent), m_sensorManager(nullptr, hwmonRoot), m_hwmonRoot(hwmonRoot),
       m_configPath(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/thermo/config.json") {
 
     m_sensors = m_sensorManager.scanSensors();
@@ -21,10 +21,10 @@ Backend::Backend(QObject *parent)
         m_sensorId = m_sensorManager.defaultSensorId();
     }
 
-    m_fanSpeeds = SensorManager::readFanSpeeds();
+    m_fanSpeeds = SensorManager::readFanSpeeds(m_hwmonRoot);
 
     // Initial temperature read
-    m_currentTemp = m_sensorManager.readSensor(m_sensorId);
+    pollTemperature();
 
     // Initial autostart setup
     syncAutostartDesktopFile();
@@ -40,6 +40,7 @@ Backend::~Backend() {
 }
 
 double Backend::normalizedTemperature() const {
+    if (!std::isfinite(m_currentTemp)) return 0.0;
     if (m_maxTemp <= m_minTemp)
         return 0.5;
     double t = (m_currentTemp - m_minTemp) / (m_maxTemp - m_minTemp);
@@ -47,6 +48,7 @@ double Backend::normalizedTemperature() const {
 }
 
 QString Backend::formattedTemperature() const {
+    if (!std::isfinite(m_currentTemp)) return tr("Unavailable");
     if (m_unit == "F") {
         double f = (m_currentTemp * 9.0 / 5.0) + 32.0;
         return QString("%1°F").arg(QString::number(f, 'f', 1));
@@ -55,6 +57,7 @@ QString Backend::formattedTemperature() const {
 }
 
 QColor Backend::currentColor() const {
+    if (m_temperatureStatus != "live") return QColor("#94a3b8");
     return calculateGradientColor(normalizedTemperature());
 }
 
@@ -104,44 +107,71 @@ QVariantList Backend::availableSensors() const {
         map["isCpu"] = s.isCpu;
         map["isDefault"] = s.isDefault;
 
-        if (m_unit == "F") {
-            double f = (s.currentTemp * 9.0 / 5.0) + 32.0;
-            map["tempString"] = QString("%1°F").arg(QString::number(f, 'f', 1));
+        map["status"] = s.currentTemp ? "live" : "unavailable";
+        if (!s.currentTemp) {
+            map["tempString"] = tr("Unavailable");
+            map["temp"] = QVariant();
         } else {
-            map["tempString"] = QString("%1°C").arg(QString::number(s.currentTemp, 'f', 1));
+            const double value = m_unit == "F" ? *s.currentTemp * 9 / 5 + 32 : *s.currentTemp;
+            map["tempString"] = QString::number(value, 'f', 1) + (m_unit == "F" ? "°F" : "°C");
+            map["temp"] = *s.currentTemp;
         }
-
-        map["temp"] = s.currentTemp;
         list.append(map);
     }
     return list;
 }
 
+QString Backend::temperatureWarning() const {
+    if (m_temperatureStatus == "live") return {};
+    QString warning = m_temperatureError == "missing" ? tr("Sensor missing")
+        : m_temperatureError == "no_valid_sources" ? tr("No valid temperature sources")
+        : tr("Sensor reading failed");
+    if (m_temperatureStatus == "stale")
+        warning += tr(" • Stale reading");
+    return warning;
+}
+
 void Backend::pollTemperature() {
-    const auto fans = SensorManager::readFanSpeeds();
+    const auto fans = SensorManager::readFanSpeeds(m_hwmonRoot);
     if (fans != m_fanSpeeds) {
         m_fanSpeeds = fans;
         emit fanSpeedsChanged();
     }
-    double newTemp = m_sensorManager.readSensor(m_sensorId);
-    if (std::abs(newTemp - m_currentTemp) > 0.05) {
-        m_currentTemp = newTemp;
-        emit temperatureChanged();
+    m_sensors = m_sensorManager.scanSensors();
+    // Preserve a disappeared selected channel in the selector, flagged unavailable.
+    bool selectedFound = false;
+    for (const auto &sensor : m_sensors) selectedFound |= sensor.id == m_sensorId;
+    if (!selectedFound) {
+        SensorInfo missing{};
+        missing.id = m_sensorId;
+        missing.label = m_sensorId + tr(" (missing)");
+        m_sensors.append(missing);
     }
+    emit sensorsUpdated();
+    const auto reading = m_sensorManager.readSensor(m_sensorId);
+    if (reading) {
+        m_currentTemp = *reading;
+        m_lastReadingAt = QDateTime::currentDateTimeUtc();
+        m_temperatureStatus = "live";
+        m_temperatureError.clear();
+    } else {
+        m_temperatureStatus = std::isfinite(m_currentTemp) ? "stale" : "unavailable";
+        m_temperatureError = m_sensorManager.sensorError(m_sensorId);
+    }
+    emit temperatureChanged();
 }
 
 void Backend::refreshSensors() {
-    m_sensors = m_sensorManager.scanSensors();
-    emit sensorsUpdated();
     pollTemperature();
 }
 
 void Backend::setSensorId(const QString &id) {
     if (m_sensorId != id) {
         m_sensorId = id;
-        m_currentTemp = m_sensorManager.readSensor(m_sensorId);
+        m_currentTemp = std::numeric_limits<double>::quiet_NaN();
+        m_lastReadingAt = {};
+        pollTemperature();
         emit sensorChanged();
-        emit temperatureChanged();
         saveConfig();
     }
 }

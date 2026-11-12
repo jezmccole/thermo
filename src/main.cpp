@@ -51,20 +51,8 @@ int main(int argc, char *argv[]) {
     // Fast-path: standalone --json or status request without GUI
     if (parser.isSet(jsonOpt) || action == "status") {
         SensorManager sm;
-        const auto sensors = sm.scanSensors();
-        QJsonObject root;
-        root["defaultSensor"] = sm.defaultSensorId();
-        QJsonObject sensorObj;
-        for (const auto &s : sensors) {
-            QJsonObject item;
-            item["label"] = s.label;
-            item["driver"] = s.driver;
-            item["tempC"] = s.currentTemp;
-            item["isCpu"] = s.isCpu;
-            sensorObj[s.id] = item;
-        }
-        root["sensors"] = sensorObj;
-        std::cout << QJsonDocument(root).toJson(QJsonDocument::Indented).toStdString() << std::endl;
+        sm.scanSensors();
+        std::cout << QJsonDocument(sm.snapshotJson()).toJson(QJsonDocument::Indented).toStdString() << std::endl;
         return 0;
     }
 

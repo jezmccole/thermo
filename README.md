@@ -63,7 +63,7 @@ thermo --version
 thermo quit            # Quit the running instance
 ```
 
-`--json` does not currently include saved configuration or fan readings. `close`, `toggle`, and `quit` should be used with an existing running instance; their no-instance behaviour still needs improvement.
+`--json` does not currently include saved configuration or fan readings. Each temperature sensor now includes `status` (`live` or `unavailable`) and `error` (empty, `missing`, `read_failed`, or `no_valid_sources`). `tempC` is a number for a valid reading and `null` otherwise; consumers must handle `null`. This one-shot snapshot has no historical reading to mark stale. A disappeared channel is absent from the snapshot; an unreadable channel that is still discoverable remains listed. `close`, `toggle`, and `quit` should be used with an existing running instance; their no-instance behaviour still needs improvement.
 
 To restart a running instance, run `thermo quit`, wait for it to exit, then run `thermo --background`.
 
@@ -81,7 +81,8 @@ The default sensor is Central Processor Proximity (`TC0P`) when available, then 
 
 - **Cannot see the rail:** look at the right edge of the desktop with covering windows moved aside. Check that Thermo is running in a Wayland session.
 - **Missing fan speed:** some hardware exposes no readable `fan*_input` entries. Missing or invalid fan readings are shown as unavailable; 0 RPM is a valid stopped-fan reading.
-- **Unexpected temperature:** verify your selected sensor and compare with hwmon readings. Some existing temperature failure paths retain an old reading or return a fallback value. Removing these misleading fallbacks is the next milestone; do not treat the current display as a hardware safety alarm.
+- **Sensor warning:** the rail turns amber and loses its temperature fill when the selected sensor is missing or faulty. The badge and Settings explicitly flag the problem. A real previous reading remains marked stale (`*` in the badge); Settings shows its last successful UTC timestamp. If there has been no valid reading, the display says Unavailable. Recovery is detected automatically on the next successful poll; switching sensors clears the previous sensor’s reading. Fault flags, malformed/non-finite readings, and values outside −20°C to 140°C are rejected. These are validity bounds, not hardware safety limits.
+- **Unexpected temperature:** verify the selected sensor against the kernel's hwmon readings. CPU/system averages use fresh valid contributors on every poll and are unavailable when none are usable. Thermo is not a hardware safety alarm.
 - **Theme does not fully match:** only Settings accent and rounding currently follow Omarchy; the glass badge uses its own palette.
 - **Multiple installed copies:** `command -v thermo` shows which executable is used. A manually installed `~/.local/bin/thermo` may override the packaged `/usr/bin/thermo`.
 - Monitor selection, left-edge placement, full theme integration, and temperature history remain planned features.
@@ -103,7 +104,7 @@ If you previously installed a separate copy in `~/.local/bin`, remove that copy 
 ./bin/test
 ```
 
-Tests run offscreen with a temporary configuration directory. Hardware-independent fan fixtures cover labels, stopped fans, and invalid values; some existing temperature tests also inspect host sensors. Hover, placement, and rendering require manual Wayland verification.
+Tests run offscreen with a temporary configuration directory. Hardware-independent fan fixtures cover labels, stopped fans, and invalid values; temperature fixtures cover failures, recovery, composite averages, and JSON availability without requiring host sensors. Hover, placement, and rendering require manual Wayland verification.
 
 Report bugs through [GitHub issues](https://github.com/jezmccole/thermo/issues), including Thermo/Omarchy versions, hardware, sensor driver, reproduction steps, and relevant logs. Check screenshots and logs for personal information before sharing. Pull requests are welcome: explain the problem, keep the change focused, and include relevant validation.
 

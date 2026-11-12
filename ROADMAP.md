@@ -10,7 +10,7 @@ Thermo is created by Kairos Medical Informatics Ltd. Our first audience is Omarc
 
 Completion: documentation matches the current code and scripts; About is readable and links to the repository; the build and existing tests pass. Fresh-machine installation remains part of milestone 4.
 
-## 2. Trustworthy readings — next
+## 2. Trustworthy readings — delivered
 
 - Remove invented temperature fallbacks and distinguish valid, unavailable, and stale readings.
 - Handle missing sensors, malformed readings, sensor disappearance, and recovery explicitly, including composite temperatures.
@@ -18,7 +18,7 @@ Completion: documentation matches the current code and scripts; About is readabl
 
 Completion: fixture-based tests cover failures and recovery; the interface never presents an invented value as a live measurement. Specify any JSON compatibility changes before implementation.
 
-## 3. Full Omarchy theme integration — planned
+## 3. Full Omarchy theme integration — next
 
 - Follow background, foreground, muted text, accents, borders, typography, and compatible style tokens.
 - Apply theme changes live and provide a Classic Glass appearance option.

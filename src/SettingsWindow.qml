@@ -38,7 +38,7 @@ ApplicationWindow {
             // Top Header Banner
             Rectangle {
                 Layout.fillWidth: true
-                height: 100
+                height: 130
                 radius: Math.max(8, theme.radius)
                 color: "#161b22"
                 border.color: "#30363d"
@@ -86,6 +86,15 @@ ApplicationWindow {
                             Layout.fillWidth: true
                         }
 
+                        Text {
+                            text: backend.temperatureWarning + (backend.temperatureStatus === "stale" ? "\n" + qsTr("Last read: %1").arg(backend.lastReadingAt) : "")
+                            visible: backend.temperatureStatus !== "live"
+                            color: "#fbbf24"
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                        }
+
                         // Gradient preview bar
                         Rectangle {
                             Layout.fillWidth: true
@@ -94,6 +103,7 @@ ApplicationWindow {
                             color: "#21262d"
 
                             Rectangle {
+                                visible: backend.temperatureStatus === "live"
                                 width: Math.max(4, parent.width * backend.normalizedTemperature)
                                 height: parent.height
                                 radius: 2
@@ -153,6 +163,7 @@ ApplicationWindow {
                             }
 
                             function updateSelectedIndex() {
+                                currentIndex = -1
                                 for (var i = 0; i < model.length; ++i) {
                                     if (model[i].id === backend.sensorId) {
                                         currentIndex = i

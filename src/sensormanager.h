@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QObject>
+#include <optional>
+#include <QJsonObject>
 #include <QString>
 #include <QList>
 #include <QVariantMap>
@@ -11,7 +13,7 @@ struct SensorInfo {
     QString label;       // e.g. "Central Processor Proximity (TC0P)"
     QString driver;      // e.g. "applesmc", "coretemp"
     QString inputPath;   // path to sysfs temp*_input (empty for virtual)
-    double currentTemp;  // in Celsius
+    std::optional<double> currentTemp;  // in Celsius
     bool isCpu;
     bool isDefault;
 };
@@ -20,12 +22,14 @@ class SensorManager : public QObject {
     Q_OBJECT
 
 public:
-    explicit SensorManager(QObject *parent = nullptr);
+    explicit SensorManager(QObject *parent = nullptr, const QString &hwmonRoot = "/sys/class/hwmon");
 
     QList<SensorInfo> scanSensors();
     static QVariantList readFanSpeeds(const QString &hwmonRoot = "/sys/class/hwmon");
-    double readSensor(const QString &id);
-    double readRawPath(const QString &path);
+    QJsonObject snapshotJson() const;
+    QString sensorError(const QString &id) const;
+    std::optional<double> readSensor(const QString &id);
+    std::optional<double> readRawPath(const QString &path);
 
     QString defaultSensorId() const;
     QString sensorLabel(const QString &id) const;
@@ -33,8 +37,8 @@ public:
     static QString formatAppleSmcLabel(const QString &code);
 
 private:
-    double calculateCpuAverage();
-    double calculateAllAverage();
+    std::optional<double> calculateAverage(bool cpuOnly) const;
+    QString m_hwmonRoot;
 
     QList<SensorInfo> m_cachedSensors;
 };
