@@ -3,6 +3,11 @@
 #include <QSaveFile>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickWindow>
+#include <QQuickItem>
+#include <QPointer>
+#include <QGuiApplication>
+#include <QQuickStyle>
 #include <cmath>
 #include <QFile>
 #include <QTemporaryDir>
@@ -31,6 +36,7 @@ class ThermoTests : public QObject {
     }
 private slots:
     void initTestCase() {
+        QQuickStyle::setStyle("Material");
         QVERIFY(configDir.isValid());
         QVERIFY(hwmonRoot.isValid());
         setupCpu(hwmonRoot.path());
@@ -173,6 +179,154 @@ private slots:
         backend.refreshSensors();
         QVERIFY(fill->property("visible").toBool());
         QCOMPARE(rail->property("x"), x);
+    }
+
+    void desktopPlacementMirrorsAndStaysInsideSmallDisplays() {
+        Backend backend(nullptr, hwmonRoot.path());
+        Theme theme(configDir.path());
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        engine.rootContext()->setContextProperty("theme", &theme);
+        engine.load(QUrl("qrc:/DesktopThermometer.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QVERIFY(window);
+        window->setHeight(480);
+        auto rail = window->findChild<QQuickItem*>("temperatureRail");
+        auto badge = window->findChild<QQuickItem*>("readoutBadge");
+        auto fan = window->findChild<QQuickItem*>("fanRail");
+        QVERIFY(rail); QVERIFY(badge); QVERIFY(fan);
+        QTRY_COMPARE(rail->x(), window->width() - rail->width() - 2);
+        backend.setFanRailEnabled(true);
+        backend.setEdge("left");
+        QTRY_COMPARE(rail->x(), 2.0);
+        QCOMPARE(fan->x(), rail->width() + 4);
+        QCOMPARE(badge->x(), rail->width() + 12);
+        window->setProperty("isHovered", true);
+        QCOMPARE(rail->x(), 2.0);
+        const auto region = window->property("inputRect").toRectF();
+        QVERIFY(region.left() >= 0);
+        QVERIFY(region.right() <= window->width());
+        backend.setRailY(10000);
+        backend.setBarHeight(750);
+        QTRY_VERIFY(rail->y() + rail->height() <= window->height() - 20);
+        QCOMPARE(backend.barHeight(), 750);
+        window->setHeight(200);
+        QTRY_VERIFY(rail->y() + rail->height() <= 180);
+        QCOMPARE(backend.barHeight(), 750);
+        window->setHeight(480);
+        backend.setBarHeight(127);
+        rail->setY(160); // Simulate a completed drag and restore its binding.
+        QVERIFY(QMetaObject::invokeMethod(window, "finishDrag", Q_ARG(QVariant, true)));
+        QCOMPARE(backend.railY(), 160);
+        window->setHeight(220);
+        QTRY_VERIFY(rail->y() + rail->height() <= 200);
+        window->setHeight(480);
+        QTRY_COMPARE(rail->y(), 160.0);
+        backend.setEdge("right");
+        QTRY_COMPARE(rail->x(), window->width() - rail->width() - 2);
+        QCOMPARE(fan->x(), -10.0);
+        QVERIFY(badge->x() < 0);
+    }
+
+    void monitorPreferenceAndFallbackPersist() {
+        {
+            Backend backend(nullptr, hwmonRoot.path());
+            QCOMPARE(backend.edge(), QString("right"));
+            QVERIFY(backend.screenName().isEmpty());
+            QVERIFY(!backend.availableScreens().isEmpty());
+            backend.setEdge("left");
+            backend.setEdge("invalid");
+            QCOMPARE(backend.edge(), QString("left"));
+            backend.setScreenName("disconnected-test-display");
+            QVERIFY(backend.screenWarning().contains("disconnected"));
+            const auto missing = backend.availableScreens().last().toMap();
+            QVERIFY(!missing["connected"].toBool());
+            QCOMPARE(missing["name"].toString(), backend.screenName());
+            QWindow window;
+            backend.configureDesktopWindow(&window);
+            QCOMPARE(window.screen(), QGuiApplication::primaryScreen());
+        }
+        Backend restored(nullptr, hwmonRoot.path());
+        QCOMPARE(restored.edge(), QString("left"));
+        QCOMPARE(restored.screenName(), QString("disconnected-test-display"));
+        restored.setScreenName("");
+        QVERIFY(restored.screenWarning().isEmpty());
+    }
+
+    void placementReloadPreservesSettings() {
+        Backend backend(nullptr, hwmonRoot.path());
+        Theme theme(configDir.path());
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        engine.rootContext()->setContextProperty("theme", &theme);
+        QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+        engine.load(QUrl("qrc:/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto root = engine.rootObjects().first();
+        QPointer<QObject> original = root->property("desktopWindow").value<QObject*>();
+        QVERIFY(original);
+        QTRY_VERIFY(qobject_cast<QWindow*>(original.data())->isVisible());
+        backend.openSettings();
+        backend.setEdge("left");
+        QTRY_VERIFY(original.isNull());
+        QVERIFY(root->property("desktopWindow").value<QObject*>());
+        QTRY_VERIFY(qobject_cast<QWindow*>(root->property("desktopWindow").value<QObject*>())->isVisible());
+        QVERIFY(backend.settingsVisible());
+        QCOMPARE(warnings.count(), 0);
+    }
+
+    void settingsHaveRealMarginsAndScrollableSections_data() {
+        QTest::addColumn<int>("windowWidth");
+        QTest::addColumn<int>("windowHeight");
+        QTest::addColumn<int>("fontSize");
+        QTest::addColumn<bool>("light");
+        QTest::newRow("narrow") << 520 << 560 << 12 << false;
+        QTest::newRow("narrow-large-font") << 520 << 560 << 18 << false;
+        QTest::newRow("light-large-font") << 640 << 720 << 18 << true;
+    }
+
+    void settingsHaveRealMarginsAndScrollableSections() {
+        QFETCH(int, windowWidth); QFETCH(int, windowHeight); QFETCH(int, fontSize); QFETCH(bool, light);
+        QVERIFY(QDir().mkpath(configDir.path() + "/theme"));
+        QFile fontFile(configDir.path() + "/theme/shell.toml");
+        QVERIFY(fontFile.open(QIODevice::WriteOnly));
+        fontFile.write("[font]\nbase-size=" + QByteArray::number(fontSize)); fontFile.close();
+        if (light) {
+            QFile colors(configDir.path() + "/theme/colors.toml");
+            QVERIFY(colors.open(QIODevice::WriteOnly));
+            colors.write("background=\"#f5f5f5\"\nforeground=\"#202020\"\n");
+        }
+        Backend backend(nullptr, hwmonRoot.path());
+        Theme theme(configDir.path());
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        engine.rootContext()->setContextProperty("theme", &theme);
+        QSignalSpy warnings(&engine, &QQmlEngine::warnings);
+        engine.load(QUrl("qrc:/SettingsWindow.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QVERIFY(window);
+        window->setWidth(windowWidth); window->setHeight(windowHeight);
+        backend.openSettings();
+        auto column = window->findChild<QQuickItem*>("settingsColumn");
+        auto scroll = window->findChild<QQuickItem*>("settingsScroll");
+        auto footer = window->findChild<QQuickItem*>("settingsFooter");
+        QVERIFY(column); QVERIFY(scroll); QVERIFY(footer);
+        QTRY_VERIFY(column->height() > scroll->height());
+        QCOMPARE(column->x(), double(window->property("pagePadding").toInt()));
+        QVERIFY(column->x() >= 24);
+        QTRY_VERIFY(column->x() + column->width() <= window->width() - 24);
+        qreal lastBottom = 0;
+        for (auto item : column->childItems()) {
+            if (!item->isVisible() || item->width() == 0) continue;
+            QVERIFY(item->y() >= lastBottom);
+            QVERIFY(item->height() > 0);
+            QVERIFY(item->width() <= column->width() + 1);
+            lastBottom = item->y() + item->height();
+        }
+        QVERIFY(footer->height() > 0);
+        QCOMPARE(warnings.count(), 0);
     }
 
     void compactDefaultsAndColorEndpoints() {

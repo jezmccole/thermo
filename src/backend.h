@@ -43,7 +43,10 @@ class Backend : public QObject {
     Q_PROPERTY(int expandedWidth READ expandedWidth NOTIFY appearanceChanged)
     Q_PROPERTY(int barHeight READ barHeight NOTIFY appearanceChanged)
     Q_PROPERTY(int railY READ railY NOTIFY positionChanged)
-    Q_PROPERTY(QString edge READ edge NOTIFY appearanceChanged)
+    Q_PROPERTY(QString edge READ edge NOTIFY placementChanged)
+    Q_PROPERTY(QString screenName READ screenName NOTIFY placementChanged)
+    Q_PROPERTY(QVariantList availableScreens READ availableScreens NOTIFY screensChanged)
+    Q_PROPERTY(QString screenWarning READ screenWarning NOTIFY screensChanged)
 
     Q_PROPERTY(bool settingsVisible READ settingsVisible NOTIFY settingsVisibilityChanged)
 
@@ -81,6 +84,9 @@ public:
     int barHeight() const { return m_barHeight; }
     int railY() const { return m_railY; }
     QString edge() const { return m_edge; }
+    QString screenName() const { return m_screenName; }
+    QVariantList availableScreens() const;
+    QString screenWarning() const;
 
     bool settingsVisible() const { return m_settingsVisible; }
 
@@ -91,6 +97,9 @@ public:
     Q_INVOKABLE void setAutostart(bool enabled);
     Q_INVOKABLE void setUnit(const QString &unit);
     Q_INVOKABLE void setRailY(int y);
+    Q_INVOKABLE void setEdge(const QString &edge);
+    Q_INVOKABLE void setScreenName(const QString &name);
+    Q_INVOKABLE void configureDesktopWindow(QWindow *window);
     Q_INVOKABLE void setBarHeight(int h);
     Q_INVOKABLE void setIdleWidth(int w);
     Q_INVOKABLE void setTemperatureRange(double minT, double maxT);
@@ -111,6 +120,8 @@ signals:
     void unitChanged();
     void appearanceChanged();
     void positionChanged();
+    void placementChanged();
+    void screensChanged();
     void settingsVisibilityChanged();
 
 private slots:
@@ -145,6 +156,7 @@ private:
     int m_barHeight = 127;
     int m_railY = 210;
     QString m_edge = "right";
+    QString m_screenName;
 
     bool m_settingsVisible = false;
     QString m_configPath;

@@ -11,12 +11,13 @@ Window {
     property color warningColor: followTheme && theme.tokens.light ? "#92400e" : "#fbbf24"
     property color chromeColor: followTheme ? theme.tokens.border : "#38bdf8"
     property string textFamily: followTheme ? theme.tokens.fontFamily : Qt.application.font.family
-    visible: true
+    property bool leftEdge: backend.edge === "left"
+    visible: false
     color: "transparent"
     flags: Qt.FramelessWindowHint
 
     LayerShell.Window.layer: LayerShell.Window.LayerBottom
-    LayerShell.Window.anchors: LayerShell.Window.AnchorRight | LayerShell.Window.AnchorTop | LayerShell.Window.AnchorBottom
+    LayerShell.Window.anchors: (leftEdge ? LayerShell.Window.AnchorLeft : LayerShell.Window.AnchorRight) | LayerShell.Window.AnchorTop | LayerShell.Window.AnchorBottom
     LayerShell.Window.exclusionZone: 0
     LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
     LayerShell.Window.scope: "thermo-desktop-strip"
@@ -27,13 +28,30 @@ Window {
     // A window mask also defines the Wayland input region. Expand it before
     // showing the badge, and retain it through the fade-out.
     property int topHitMargin: backend.fanRailEnabled ? 20 : 8
-    property rect inputRect: Qt.rect(
-        readoutPill.visible || isHovered || isDragging ? Math.floor(railContainer.x + readoutPill.x - 5) : railContainer.x - 12,
-        Math.max(0, railContainer.y + Math.min(-topHitMargin, readoutPill.visible ? readoutPill.y - 4 : -topHitMargin)),
-        readoutPill.visible || isHovered || isDragging ? Math.ceil(readoutPill.width + 32 + railContainer.width) : railContainer.width + 16,
-        Math.max(railContainer.height + 8, readoutPill.visible ? readoutPill.y + readoutPill.height + 4 : 0) - Math.min(-topHitMargin, readoutPill.visible ? readoutPill.y - 4 : -topHitMargin))
+    property rect inputRect: {
+        const railLeft = railContainer.x - (leftEdge ? 4 : 12)
+        const railRight = railContainer.x + railContainer.width + (leftEdge ? 12 : 4)
+        const includeBadge = readoutPill.visible || isHovered || isDragging
+        const left = Math.max(0, includeBadge ? Math.min(railLeft, railContainer.x + readoutPill.x - 4) : railLeft)
+        const right = Math.min(width, includeBadge ? Math.max(railRight, railContainer.x + readoutPill.x + readoutPill.width + 4) : railRight)
+        const top = Math.max(0, railContainer.y + Math.min(-topHitMargin, includeBadge ? readoutPill.y - 4 : -topHitMargin))
+        const bottom = Math.min(height, railContainer.y + Math.max(railContainer.height + 8, includeBadge ? readoutPill.y + readoutPill.height + 4 : 0))
+        return Qt.rect(left, top, Math.max(1, right - left), Math.max(1, bottom - top))
+    }
     onInputRectChanged: backend.setInputRegion(thermoWindow, inputRect)
-    Component.onCompleted: backend.setInputRegion(thermoWindow, inputRect)
+    Component.onCompleted: {
+        backend.configureDesktopWindow(thermoWindow)
+        visible = true
+        backend.setInputRegion(thermoWindow, inputRect)
+    }
+
+    readonly property real effectiveBarHeight: Math.min(backend.barHeight, Math.max(1, height - 48))
+    readonly property real maximumRailY: Math.max(28, height - effectiveBarHeight - 20)
+    function clampRailY(value) { return Math.max(28, Math.min(maximumRailY, value)) }
+    function finishDrag(moved) {
+        if (moved) backend.setRailY(Math.round(railContainer.y))
+        railContainer.y = Qt.binding(function() { return thermoWindow.clampRailY(backend.railY) })
+    }
 
     property bool rawHover: mouseArea.containsMouse || (readoutPill.visible && pillMouseArea.containsMouse)
     property bool isHovered: rawHover || hoverGraceTimer.running
@@ -57,13 +75,12 @@ Window {
     Item {
         id: railContainer
         objectName: "temperatureRail"
-        anchors.right: parent.right
-        anchors.rightMargin: 2
-        y: backend.railY
+        x: thermoWindow.leftEdge ? 2 : thermoWindow.width - width - 2
+        y: thermoWindow.clampRailY(backend.railY)
 
         // Fixed width: the thermometer scale NEVER moves or expands horizontally on hover
         width: backend.idleWidth
-        height: backend.barHeight
+        height: thermoWindow.effectiveBarHeight
 
         RailMarker {
             objectName: "heatRailMarker"
@@ -109,7 +126,7 @@ Window {
                         orientation: Gradient.Vertical
                         GradientStop { position: 0.00; color: "#dc2626" } // Crimson Red (hot)
                         GradientStop { position: 0.28; color: "#ea580c" } // Hot orange
-                        GradientStop { position: 0.55; color: thermoWindow.mutedColor } // Neutral midpoint
+                        GradientStop { position: 0.55; color: "#94a3b8" } // Neutral midpoint
                         GradientStop { position: 1.00; color: "#38bdf8" } // Arctic Cold Blue
                     }
                 }
@@ -143,7 +160,7 @@ Window {
                 y: -15
             }
             visible: backend.fanRailEnabled
-            x: -10
+            x: thermoWindow.leftEdge ? railContainer.width + 4 : -10
             width: 6
             height: parent.height
             radius: 3
@@ -170,10 +187,10 @@ Window {
         // Floating holographic readout pill anchored adjacent to current temperature level
         Item {
             id: readoutPill
-            anchors.right: trackBackground.left
-            anchors.rightMargin: 12
+            objectName: "readoutBadge"
+            x: thermoWindow.leftEdge ? railContainer.width + 12 : -width - 12
             // Centered on the rail so sensor updates cannot move the hover target.
-            y: (railContainer.height - height) / 2
+            y: Math.max(4 - railContainer.y, Math.min(thermoWindow.height - railContainer.y - height - 4, (railContainer.height - height) / 2))
 
             width: pillContent.width + 24
             height: pillContent.height + 16
@@ -229,7 +246,7 @@ Window {
 
             // Connecting hairline tick between pill and rail
             Rectangle {
-                anchors.left: parent.right
+                x: thermoWindow.leftEdge ? -12 : parent.width
                 anchors.verticalCenter: parent.verticalCenter
                 width: 12
                 height: 1
@@ -269,7 +286,7 @@ Window {
                         text: backend.formattedTemperature + (backend.temperatureStatus === "stale" ? " *" : "")
                         color: thermoWindow.textColor
                         font.family: thermoWindow.textFamily
-                    font.pixelSize: Math.round(16 * thermoWindow.textScale)
+                        font.pixelSize: Math.round(16 * thermoWindow.textScale)
                         font.weight: Font.DemiBold
                         anchors.verticalCenter: parent.verticalCenter
                     }
@@ -311,7 +328,7 @@ Window {
                         text: modelData.label + ": " + (modelData.rpm < 0 ? qsTr("Unavailable") : modelData.rpm + " RPM")
                         color: thermoWindow.textColor
                         font.family: thermoWindow.textFamily
-                    font.pixelSize: Math.round(11 * thermoWindow.textScale)
+                        font.pixelSize: Math.round(11 * thermoWindow.textScale)
                         font.features: { "tnum": 1 }
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
@@ -364,7 +381,7 @@ Window {
                 drag.target: railContainer
                 drag.axis: Drag.YAxis
                 drag.minimumY: 28
-                drag.maximumY: Math.max(28, thermoWindow.height - railContainer.height - 20)
+                drag.maximumY: thermoWindow.maximumRailY
 
                 property real startY: 0
                 property bool moved: false
@@ -380,11 +397,8 @@ Window {
                     }
                 }
 
-                onReleased: {
-                    if (moved) {
-                        backend.setRailY(railContainer.y)
-                    }
-                }
+                onReleased: thermoWindow.finishDrag(moved)
+                onCanceled: thermoWindow.finishDrag(false)
 
                 onClicked: {
                     if (!moved) {
@@ -398,8 +412,8 @@ Window {
         MouseArea {
             id: mouseArea
             anchors.fill: parent
-            anchors.leftMargin: -12
-            anchors.rightMargin: -4
+            anchors.leftMargin: thermoWindow.leftEdge ? -4 : -12
+            anchors.rightMargin: thermoWindow.leftEdge ? -12 : -4
             anchors.topMargin: -thermoWindow.topHitMargin
             anchors.bottomMargin: -8
             hoverEnabled: true
@@ -408,7 +422,7 @@ Window {
             drag.target: railContainer
             drag.axis: Drag.YAxis
             drag.minimumY: 28
-            drag.maximumY: Math.max(28, thermoWindow.height - railContainer.height - 20)
+            drag.maximumY: thermoWindow.maximumRailY
 
             property real startY: 0
             property bool moved: false
@@ -424,11 +438,8 @@ Window {
                 }
             }
 
-            onReleased: {
-                if (moved) {
-                    backend.setRailY(railContainer.y)
-                }
-            }
+            onReleased: thermoWindow.finishDrag(moved)
+            onCanceled: thermoWindow.finishDrag(false)
 
             onClicked: {
                 if (!moved) {

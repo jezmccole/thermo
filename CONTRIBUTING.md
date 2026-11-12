@@ -24,7 +24,7 @@ The CI workflow builds in a fresh Arch container, runs the checks as an unprivil
 
 ## Manual Wayland checks
 
-For interface changes, check rail stability during repeated hovering, badge/gap transitions, clicking versus dragging, saved position, and clicks through transparent areas. Check enabled and disabled fan rails, zero RPM and unavailable data, light/dark themes and Classic Glass, and live theme changes. Verify both minimum and increased font sizes for clipping.
+For interface changes, check rail stability during repeated hovering, badge/gap transitions, clicking versus dragging, saved position, and clicks through transparent areas. Check enabled and disabled fan rails, zero RPM and unavailable data, light/dark themes and Classic Glass, and live theme changes. Verify both minimum and increased font sizes for clipping. For Settings changes, check the 520-pixel minimum width, page/card padding, wrapped descriptions, scrolling, and persistent action buttons. Check monitor fallback and preference restoration separately from actual physical hotplug tests.
 
 Offscreen checks cannot validate Wayland input masks or compositor placement. For sensor-state changes, include failure and recovery cases in fixtures; never replace missing readings with invented temperatures.
 

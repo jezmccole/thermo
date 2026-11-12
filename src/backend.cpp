@@ -1,6 +1,9 @@
 #include "backend.h"
 
 #include <QCoreApplication>
+#include <QGuiApplication>
+#include <QScreen>
+#include <LayerShellQt/window.h>
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
@@ -28,6 +31,25 @@ Backend::Backend(QObject *parent, const QString &hwmonRoot)
 
     // Initial autostart setup
     syncAutostartDesktopFile();
+
+    const auto watchScreen = [this](QScreen *screen) {
+        connect(screen, &QScreen::geometryChanged, this, [this] { emit screensChanged(); });
+        connect(screen, &QScreen::availableGeometryChanged, this, [this] { emit screensChanged(); });
+    };
+    for (auto screen : QGuiApplication::screens()) watchScreen(screen);
+    connect(qGuiApp, &QGuiApplication::screenAdded, this, [this, watchScreen](QScreen *screen) {
+        watchScreen(screen);
+        emit screensChanged();
+        emit placementChanged();
+    });
+    connect(qGuiApp, &QGuiApplication::screenRemoved, this, [this] {
+        emit screensChanged();
+        emit placementChanged();
+    });
+    connect(qGuiApp, &QGuiApplication::primaryScreenChanged, this, [this] {
+        emit screensChanged();
+        emit placementChanged();
+    });
 
     // Set up polling timer (1.5 seconds)
     connect(&m_pollTimer, &QTimer::timeout, this, &Backend::pollTemperature);
@@ -237,6 +259,56 @@ void Backend::setRailY(int y) {
     }
 }
 
+QVariantList Backend::availableScreens() const {
+    QVariantList choices{QVariantMap{{"name", ""}, {"label", tr("Primary display (automatic)")}, {"connected", true}}};
+    bool savedFound = m_screenName.isEmpty();
+    for (auto screen : QGuiApplication::screens()) {
+        if (screen->name().isEmpty()) continue;
+        const auto size = screen->geometry().size();
+        choices.append(QVariantMap{{"name", screen->name()},
+            {"label", tr("%1 • %2 × %3").arg(screen->name()).arg(size.width()).arg(size.height())}, {"connected", true}});
+        savedFound |= screen->name() == m_screenName;
+    }
+    if (!savedFound)
+        choices.append(QVariantMap{{"name", m_screenName}, {"label", tr("%1 (disconnected)").arg(m_screenName)}, {"connected", false}});
+    return choices;
+}
+
+QString Backend::screenWarning() const {
+    if (m_screenName.isEmpty()) return {};
+    for (auto screen : QGuiApplication::screens()) if (screen->name() == m_screenName) return {};
+    return tr("Saved display %1 is disconnected. Using the primary display until it returns.").arg(m_screenName);
+}
+
+void Backend::setEdge(const QString &edge) {
+    if ((edge != "left" && edge != "right") || edge == m_edge) return;
+    m_edge = edge;
+    emit placementChanged();
+    saveConfig();
+}
+
+void Backend::setScreenName(const QString &name) {
+    if (m_screenName == name) return;
+    m_screenName = name;
+    emit screensChanged();
+    emit placementChanged();
+    saveConfig();
+}
+
+void Backend::configureDesktopWindow(QWindow *window) {
+    if (!window) return;
+    QScreen *selected = QGuiApplication::primaryScreen();
+    for (auto screen : QGuiApplication::screens()) {
+        if (!m_screenName.isEmpty() && screen->name() == m_screenName) { selected = screen; break; }
+    }
+    // Called while the new surface is hidden. Layer-shell output selection is
+    // made at creation; recreate the desktop surface when placement changes.
+    auto layer = LayerShellQt::Window::get(window);
+    layer->setCloseOnDismissed(false);
+    layer->setScreen(selected);
+    if (selected) window->setScreen(selected);
+}
+
 void Backend::setBarHeight(int h) {
     if (m_barHeight != h) {
         m_barHeight = std::clamp(h, 80, 750);
@@ -337,8 +409,8 @@ void Backend::loadConfig() {
         m_barHeight = obj.value("barHeight").toInt(127);
     if (obj.contains("railY"))
         m_railY = obj.value("railY").toInt(210);
-    if (obj.contains("edge"))
-        m_edge = obj.value("edge").toString("right");
+    m_edge = obj.value("edge").toString() == "left" ? "left" : "right";
+    m_screenName = obj.value("screenName").toString();
 }
 
 void Backend::saveConfig() {
@@ -358,6 +430,7 @@ void Backend::saveConfig() {
     obj["barHeight"] = m_barHeight;
     obj["railY"] = m_railY;
     obj["edge"] = m_edge;
+    obj["screenName"] = m_screenName;
 
     QFile file(m_configPath);
     if (file.open(QIODevice::WriteOnly)) {

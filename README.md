@@ -12,7 +12,7 @@ A quiet desktop thermometer for Omarchy: glance at the rail, hover for a readabl
 - A smoked glass badge that stays open while hovering the rail, connecting gap, or badge.
 - Live hardware temperature and fan RPM, refreshed every 1.5 seconds.
 - Optional blue companion fan rail, sharing the temperature rail’s position and hover interaction. Enable it in Settings. Tiny fan and heat symbols identify the rails when both are visible. It shows the first detected fan’s RPM relative to its reported maximum; missing readings or maximums are flagged rather than guessed.
-- Click to open Settings; drag vertically to reposition. Default rail height: 127 pixels.
+- Click to open Settings; drag vertically to reposition. Default rail height: 127 pixels. Choose a monitor and either screen edge in Settings; the badge and fan rail always face inward.
 - Apple SMC and CPU temperature detection, with a selectable sensor and Celsius/Fahrenheit display.
 - Optional login autostart. Follow Omarchy appearance adapts badge and Settings colours, readable text, borders, font size/family, and window rounding live. Classic Glass retains the original smoked glass palette.
 
@@ -70,6 +70,14 @@ To restart a running instance, run `thermo quit`, wait for it to exit, then run 
 
 In Settings, `Esc` or `Q` closes the window while keeping the rail active. Use **Refresh** to rescan sensors.
 
+## Desktop placement and Settings
+
+Choose **Primary display (automatic)** or a named monitor under Desktop placement. A disconnected saved monitor falls back to the primary display with a warning; the saved choice is retained and reapplied when it returns. Placement changes recreate only the desktop surface, leaving Settings open.
+
+Both screen edges are supported. The temperature rail stays closest to the edge; the companion fan rail and badge face inward. Hover never moves the rails. Sizes use logical pixels so Qt applies display scaling automatically. The displayed height and vertical position are clamped to the available space while retaining your saved size and position; dragging saves a new position.
+
+Settings has consistent page/card padding, grouped fields, and a scrolling page with persistent Close/Quit buttons. Physical multi-monitor hotplug and additional hardware/display-scale combinations still need manual validation.
+
 ## Configuration and autostart
 
 Preferences are stored in `${XDG_CONFIG_HOME:-~/.config}/thermo/config.json`. Settings saves changes automatically. Stop Thermo before editing this file manually, since shutdown writes the in-memory preferences back to disk.
@@ -86,7 +94,7 @@ The default sensor is Central Processor Proximity (`TC0P`) when available, then 
 - **Unexpected temperature:** verify the selected sensor against the kernel's hwmon readings. CPU/system averages use fresh valid contributors on every poll and are unavailable when none are usable. Thermo is not a hardware safety alarm.
 - **Theme matching:** choose Follow Omarchy or Classic Glass in Settings. Follow Omarchy reads `colors.toml` and supported scalar tokens from `shell.toml`, including popup background/text/border and font base size; fontconfig supplies the system font family. Borders expressed as gradients use their first colour stop. Missing or low-contrast tokens receive readable fallbacks. Font size is bounded to keep the compact badge usable; thermal colours remain blue-to-red and the fan rail blue.
 - **Multiple installed copies:** `command -v thermo` shows which executable is used. A manually installed `~/.local/bin/thermo` may override the packaged `/usr/bin/thermo`.
-- Monitor selection, left-edge placement, and temperature history remain planned features.
+- Temperature history remains planned. Monitor selection and either-edge placement are implemented; physical multi-monitor hotplug testing remains outstanding.
 
 ## Uninstall
 
