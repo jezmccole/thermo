@@ -176,6 +176,40 @@ void Backend::setSensorId(const QString &id) {
     }
 }
 
+bool Backend::fanLevelAvailable() const {
+    if (m_fanSpeeds.isEmpty()) return false;
+    const auto fan = m_fanSpeeds.first().toMap();
+    return fan["rpm"].toInt() >= 0 && fan["maxRpm"].toInt() > 0;
+}
+
+double Backend::fanLevel() const {
+    if (!fanLevelAvailable()) return 0;
+    const auto fan = m_fanSpeeds.first().toMap();
+    return std::clamp(double(fan["rpm"].toInt()) / fan["maxRpm"].toInt(), 0.0, 1.0);
+}
+
+QString Backend::fanRailDescription() const {
+    if (m_fanSpeeds.isEmpty()) return tr("Fan rail: no fan detected");
+    const auto fan = m_fanSpeeds.first().toMap();
+    if (fan["rpm"].toInt() < 0) return tr("Fan rail: %1 • Reading unavailable").arg(fan["label"].toString());
+    if (fan["maxRpm"].toInt() <= 0) return tr("Fan rail: %1 • Maximum RPM unavailable").arg(fan["label"].toString());
+    return tr("Fan rail: %1 • %2 / %3 RPM").arg(fan["label"].toString()).arg(fan["rpm"].toInt()).arg(fan["maxRpm"].toInt());
+}
+
+void Backend::setAppearanceMode(const QString &mode) {
+    if ((mode != "omarchy" && mode != "classic") || mode == m_appearanceMode) return;
+    m_appearanceMode = mode;
+    emit appearanceChanged();
+    saveConfig();
+}
+
+void Backend::setFanRailEnabled(bool enabled) {
+    if (m_fanRailEnabled == enabled) return;
+    m_fanRailEnabled = enabled;
+    emit appearanceChanged();
+    saveConfig();
+}
+
 void Backend::setAutostart(bool enabled) {
     if (m_autostart != enabled) {
         m_autostart = enabled;
@@ -283,6 +317,8 @@ void Backend::loadConfig() {
     QJsonObject obj = QJsonDocument::fromJson(file.readAll()).object();
     if (obj.contains("sensorId"))
         m_sensorId = obj.value("sensorId").toString();
+    if (obj.value("appearanceMode").toString() == "classic") m_appearanceMode = "classic";
+    m_fanRailEnabled = obj.value("fanRailEnabled").toBool(false);
     if (obj.contains("autostart"))
         m_autostart = obj.value("autostart").toBool();
     if (obj.contains("unit"))
@@ -309,6 +345,8 @@ void Backend::saveConfig() {
 
     QJsonObject obj;
     obj["sensorId"] = m_sensorId;
+    obj["appearanceMode"] = m_appearanceMode;
+    obj["fanRailEnabled"] = m_fanRailEnabled;
     obj["autostart"] = m_autostart;
     obj["unit"] = m_unit;
     obj["minTemp"] = m_minTemp;

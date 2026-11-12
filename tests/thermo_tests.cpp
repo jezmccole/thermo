@@ -1,5 +1,6 @@
 #include <QDir>
 #include <QJsonDocument>
+#include <QSaveFile>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <cmath>
@@ -147,6 +148,12 @@ private slots:
         const auto x = rail->property("x");
         const auto width = rail->property("width");
         QVERIFY(fill->property("visible").toBool());
+        backend.setFanRailEnabled(true);
+        QCoreApplication::processEvents();
+        QCOMPARE(rail->property("x"), x);
+        QVERIFY(window->findChild<QObject*>("fanRail")->property("visible").toBool());
+        backend.setAppearanceMode("classic");
+        QCOMPARE(rail->property("x"), x);
         window->setProperty("isHovered", true);
         writeReading(root.path(), "temp1_input", "bad");
         backend.refreshSensors();
@@ -194,6 +201,34 @@ private slots:
         QCOMPARE(fans[2].toMap()["rpm"].toInt(), -1);
         QCOMPARE(fans[3].toMap()["rpm"].toInt(), -1);
         QVERIFY(SensorManager::readFanSpeeds(dir.path() + "/missing").isEmpty());
+    }
+
+    void optionalFanRailUsesRealMaximumAndPersists() {
+        QTemporaryDir root;
+        setupCpu(root.path());
+        writeReading(root.path(), "fan1_input", "3000");
+        writeReading(root.path(), "fan1_max", "6000");
+        {
+            Backend backend(nullptr, root.path());
+            QVERIFY(!backend.fanRailEnabled());
+            backend.setFanRailEnabled(true);
+            QVERIFY(backend.fanLevelAvailable());
+            QCOMPARE(backend.fanLevel(), 0.5);
+            writeReading(root.path(), "fan1_input", "0");
+            backend.refreshSensors();
+            QVERIFY(backend.fanLevelAvailable());
+            QCOMPARE(backend.fanLevel(), 0.0);
+            writeReading(root.path(), "fan1_max", "bad");
+            backend.refreshSensors();
+            QVERIFY(!backend.fanLevelAvailable());
+            QVERIFY(backend.fanRailDescription().contains("Maximum RPM unavailable"));
+            writeReading(root.path(), "fan1_fault", "1");
+            backend.refreshSensors();
+            QCOMPARE(backend.fanSpeeds()[0].toMap()["rpm"].toInt(), -1);
+            QVERIFY(backend.fanRailDescription().contains("Reading unavailable"));
+        }
+        Backend restored(nullptr, root.path());
+        QVERIFY(restored.fanRailEnabled());
     }
 
     void sensorManagerFormatsAppleSmcLabels() {
@@ -252,10 +287,57 @@ private slots:
         QCOMPARE(backend.railY(), 180);
     }
 
+    void themeTokensSwitchLiveAndKeepContrast() {
+        QTemporaryDir root;
+        QVERIFY(QDir().mkpath(root.path() + "/theme"));
+        auto write = [&](QString name, QByteArray value) {
+            QSaveFile file(root.path() + "/theme/" + name);
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write(value);
+            QVERIFY(file.commit());
+        };
+        write("colors.toml", "background = \"#ffffff\"\nforeground = \"#fffffe\"\nmuted = \"#eeeeee\"\naccent = \"#ffffff\"\n");
+        write("shell.toml", "[font]\nbase-size = 16\nfamily = \"Sans Serif\"\n");
+        Theme theme(root.path());
+        QCOMPARE(theme.tokens()["background"].toString(), QString("#ffffff"));
+        QCOMPARE(theme.tokens()["foreground"].toString(), QString("#000000"));
+        QCOMPARE(theme.tokens()["muted"].toString(), QString("#000000"));
+        QCOMPARE(theme.tokens()["baseSize"].toInt(), 16);
+        QCOMPARE(theme.tokens()["fontFamily"].toString(), QString("Sans Serif"));
+        QVERIFY(theme.tokens()["light"].toBool());
+        write("colors.toml", "background = \"#101010\"\nforeground = \"#eeeeee\"\naccent = \"#38bdf8\"\n");
+        QTRY_COMPARE(theme.tokens()["background"].toString(), QString("#101010"));
+        QCOMPARE(theme.tokens()["foreground"].toString(), QString("#eeeeee"));
+        QVERIFY(!theme.tokens()["light"].toBool());
+        write("shell.toml", "[popups]\nbackground = \"#202020\"\ntext = \"#fafafa\"\nborder = \"hyprland.active-border\"\n[hyprland]\nactive-border = \"rgba(38bdf8ff) rgba(ff0000ff)\"\n[font]\nbase-size = 999\n");
+        QTRY_COMPARE(theme.tokens()["background"].toString(), QString("#202020"));
+        QCOMPARE(theme.tokens()["border"].toString(), QString("#38bdf8"));
+        QCOMPARE(theme.tokens()["baseSize"].toInt(), 18);
+        // Replacement of the entire active theme must also be detected.
+        QVERIFY(QDir(root.path()).rename("theme", "old-theme"));
+        QVERIFY(QDir().mkpath(root.path() + "/theme"));
+        write("colors.toml", "background = \"#f0f0f0\"\n");
+        QTRY_COMPARE(theme.tokens()["background"].toString(), QString("#f0f0f0"));
+        QVERIFY(QFile::remove(root.path() + "/theme/colors.toml"));
+        QTRY_COMPARE(theme.tokens()["background"].toString(), QString("#0e1116"));
+    }
+
+    void appearancePreferencePersistsAndRejectsUnknownModes() {
+        {
+            Backend backend(nullptr, hwmonRoot.path());
+            QCOMPARE(backend.appearanceMode(), QString("omarchy"));
+            backend.setAppearanceMode("classic");
+            backend.setAppearanceMode("unknown");
+            QCOMPARE(backend.appearanceMode(), QString("classic"));
+        }
+        Backend restored(nullptr, hwmonRoot.path());
+        QCOMPARE(restored.appearanceMode(), QString("classic"));
+    }
+
     void themeFallsBack() {
         QTemporaryDir dir;
         Theme theme(dir.path());
-        QCOMPARE(theme.accent(), QString("#34D399"));
+        QCOMPARE(QColor(theme.accent()), QColor("#34D399"));
         QCOMPARE(theme.accentForeground(), QString("black"));
     }
 

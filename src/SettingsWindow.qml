@@ -11,10 +11,21 @@ ApplicationWindow {
     minimumHeight: 560
     visible: backend.settingsVisible
     title: qsTr("Thermo — Settings")
-    color: "#0e1116"
+    property bool followTheme: backend.appearanceMode === "omarchy"
+    property real textScale: followTheme ? theme.tokens.baseSize / 12 : 1
+    property color textColor: followTheme ? theme.tokens.foreground : "#f0f6fc"
+    property color mutedColor: followTheme ? theme.tokens.muted : "#8b949e"
+    property color panelColor: followTheme ? theme.tokens.panel : "#161b22"
+    property color outlineColor: followTheme ? theme.tokens.border : "#30363d"
+    property color warningColor: followTheme && theme.tokens.light ? "#92400e" : "#fbbf24"
+    property color accentColor: followTheme ? theme.tokens.accent : "#38bdf8"
+    color: followTheme ? theme.tokens.background : "#0e1116"
+    font.family: followTheme ? theme.tokens.fontFamily : Qt.application.font.family
 
-    Material.theme: Material.Dark
-    Material.accent: theme.accent
+    Material.theme: followTheme && theme.tokens.light ? Material.Light : Material.Dark
+    Material.accent: accentColor
+    Material.foreground: textColor
+    Material.background: panelColor
     Material.roundedScale: theme.radius
 
     onClosing: (close) => {
@@ -38,10 +49,10 @@ ApplicationWindow {
             // Top Header Banner
             Rectangle {
                 Layout.fillWidth: true
-                height: 130
+                height: headerContent.implicitHeight + 36
                 radius: Math.max(8, theme.radius)
-                color: "#161b22"
-                border.color: "#30363d"
+                color: panelColor
+                border.color: outlineColor
                 border.width: 1
 
                 RowLayout {
@@ -54,7 +65,7 @@ ApplicationWindow {
                         width: 64
                         height: 64
                         radius: Math.max(8, theme.radius)
-                        color: "#0d1117"
+                        color: settingsWin.color
                         border.color: Qt.rgba(backend.currentColor.r, backend.currentColor.g, backend.currentColor.b, 0.4)
                         border.width: 1
 
@@ -62,26 +73,30 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             text: backend.formattedTemperature
                             color: backend.currentColor
-                            font.pixelSize: 15
+                            font.family: settingsWin.font.family
+                            font.pixelSize: Math.round(15 * settingsWin.textScale)
                             font.bold: true
                         }
                     }
 
                     ColumnLayout {
+                        id: headerContent
                         Layout.fillWidth: true
                         spacing: 3
 
                         Text {
                             text: qsTr("Thermo")
-                            color: "#f0f6fc"
-                            font.pixelSize: 18
+                            color: textColor
+                            font.family: settingsWin.font.family
+                            font.pixelSize: Math.round(18 * settingsWin.textScale)
                             font.bold: true
                         }
 
                         Text {
                             text: backend.sensorLabel
-                            color: "#8b949e"
-                            font.pixelSize: 12
+                            color: mutedColor
+                            font.family: settingsWin.font.family
+                            font.pixelSize: Math.round(12 * settingsWin.textScale)
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                         }
@@ -89,8 +104,9 @@ ApplicationWindow {
                         Text {
                             text: backend.temperatureWarning + (backend.temperatureStatus === "stale" ? "\n" + qsTr("Last read: %1").arg(backend.lastReadingAt) : "")
                             visible: backend.temperatureStatus !== "live"
-                            color: "#fbbf24"
-                            font.pixelSize: 11
+                            color: settingsWin.warningColor
+                            font.family: settingsWin.font.family
+                            font.pixelSize: Math.round(11 * settingsWin.textScale)
                             wrapMode: Text.WordWrap
                             Layout.fillWidth: true
                         }
@@ -100,7 +116,7 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             height: 4
                             radius: 2
-                            color: "#21262d"
+                            color: panelColor
 
                             Rectangle {
                                 visible: backend.temperatureStatus === "live"
@@ -123,8 +139,8 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 implicitHeight: sensorLayout.implicitHeight + 32
                 radius: Math.max(8, theme.radius)
-                color: "#161b22"
-                border.color: "#30363d"
+                color: panelColor
+                border.color: outlineColor
                 border.width: 1
 
                 ColumnLayout {
@@ -135,15 +151,17 @@ ApplicationWindow {
 
                     Text {
                         text: qsTr("Monitored Thermometer")
-                        color: "#f0f6fc"
-                        font.pixelSize: 14
+                        color: textColor
+                        font.family: settingsWin.font.family
+                        font.pixelSize: Math.round(14 * settingsWin.textScale)
                         font.bold: true
                     }
 
                     Text {
                         text: qsTr("Select which MacBook hardware sensor to display. Default is Central Processor Proximity (TC0P).")
-                        color: "#8b949e"
-                        font.pixelSize: 11
+                        color: mutedColor
+                        font.family: settingsWin.font.family
+                        font.pixelSize: Math.round(11 * settingsWin.textScale)
                         wrapMode: Text.WordWrap
                         Layout.fillWidth: true
                     }
@@ -190,15 +208,17 @@ ApplicationWindow {
                                     spacing: 8
                                     Text {
                                         text: modelData.label
-                                        color: "#f0f6fc"
-                                        font.pixelSize: 12
+                                        color: textColor
+                                        font.family: settingsWin.font.family
+                                        font.pixelSize: Math.round(12 * settingsWin.textScale)
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
                                     }
                                     Text {
                                         text: modelData.tempString
-                                        color: theme.accent
-                                        font.pixelSize: 11
+                                        color: accentColor
+                                        font.family: settingsWin.font.family
+                                        font.pixelSize: Math.round(11 * settingsWin.textScale)
                                         font.bold: true
                                     }
                                 }
@@ -219,8 +239,8 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 implicitHeight: autostartLayout.implicitHeight + 32
                 radius: Math.max(8, theme.radius)
-                color: "#161b22"
-                border.color: "#30363d"
+                color: panelColor
+                border.color: outlineColor
                 border.width: 1
 
                 RowLayout {
@@ -235,15 +255,17 @@ ApplicationWindow {
 
                         Text {
                             text: qsTr("Launch on Startup")
-                            color: "#f0f6fc"
-                            font.pixelSize: 14
+                            color: textColor
+                            font.family: settingsWin.font.family
+                            font.pixelSize: Math.round(14 * settingsWin.textScale)
                             font.bold: true
                         }
 
                         Text {
                             text: qsTr("Start Thermo automatically in the background when your operating system loads.")
-                            color: "#8b949e"
-                            font.pixelSize: 11
+                            color: mutedColor
+                            font.family: settingsWin.font.family
+                            font.pixelSize: Math.round(11 * settingsWin.textScale)
                             wrapMode: Text.WordWrap
                             Layout.fillWidth: true
                         }
@@ -261,8 +283,8 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 implicitHeight: displayLayout.implicitHeight + 32
                 radius: Math.max(8, theme.radius)
-                color: "#161b22"
-                border.color: "#30363d"
+                color: panelColor
+                border.color: outlineColor
                 border.width: 1
 
                 ColumnLayout {
@@ -273,9 +295,39 @@ ApplicationWindow {
 
                     Text {
                         text: qsTr("Display & Behavior")
-                        color: "#f0f6fc"
-                        font.pixelSize: 14
+                        color: textColor
+                        font.family: settingsWin.font.family
+                        font.pixelSize: Math.round(14 * settingsWin.textScale)
                         font.bold: true
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text {
+                            text: qsTr("Appearance:")
+                            color: textColor
+                            Layout.fillWidth: true
+                        }
+                        ComboBox {
+                            implicitWidth: 190
+                            model: [qsTr("Follow Omarchy"), qsTr("Classic Glass")]
+                            currentIndex: settingsWin.followTheme ? 0 : 1
+                            onActivated: (index) => backend.setAppearanceMode(index === 0 ? "omarchy" : "classic")
+                        }
+                    }
+                    Switch {
+                        text: qsTr("Show companion fan rail")
+                        checked: backend.fanRailEnabled
+                        onToggled: backend.setFanRailEnabled(checked)
+                    }
+                    Text {
+                        text: backend.fanRailDescription
+                        visible: backend.fanRailEnabled
+                        color: backend.fanLevelAvailable ? mutedColor : settingsWin.warningColor
+                        font.family: settingsWin.font.family
+                        font.pixelSize: Math.round(11 * settingsWin.textScale)
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
                     }
 
                     // Unit Selection
@@ -283,8 +335,9 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         Text {
                             text: qsTr("Temperature Unit:")
-                            color: "#c9d1d9"
-                            font.pixelSize: 12
+                            color: textColor
+                            font.family: settingsWin.font.family
+                            font.pixelSize: Math.round(12 * settingsWin.textScale)
                             Layout.fillWidth: true
                         }
                         RadioButton {
@@ -307,14 +360,16 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             Text {
                                 text: qsTr("Resting Width:")
-                                color: "#c9d1d9"
-                                font.pixelSize: 12
+                                color: textColor
+                                font.family: settingsWin.font.family
+                                font.pixelSize: Math.round(12 * settingsWin.textScale)
                             }
                             Item { Layout.fillWidth: true }
                             Text {
                                 text: backend.idleWidth + " px"
-                                color: theme.accent
-                                font.pixelSize: 12
+                                color: accentColor
+                                font.family: settingsWin.font.family
+                                font.pixelSize: Math.round(12 * settingsWin.textScale)
                                 font.bold: true
                             }
                         }
@@ -336,14 +391,16 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             Text {
                                 text: qsTr("Thermometer Height:")
-                                color: "#c9d1d9"
-                                font.pixelSize: 12
+                                color: textColor
+                                font.family: settingsWin.font.family
+                                font.pixelSize: Math.round(12 * settingsWin.textScale)
                             }
                             Item { Layout.fillWidth: true }
                             Text {
                                 text: backend.barHeight + " px"
-                                color: theme.accent
-                                font.pixelSize: 12
+                                color: accentColor
+                                font.family: settingsWin.font.family
+                                font.pixelSize: Math.round(12 * settingsWin.textScale)
                                 font.bold: true
                             }
                         }
@@ -365,21 +422,24 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             Text {
                                 text: qsTr("Temperature Scale Range:")
-                                color: "#c9d1d9"
-                                font.pixelSize: 12
+                                color: textColor
+                                font.family: settingsWin.font.family
+                                font.pixelSize: Math.round(12 * settingsWin.textScale)
                             }
                             Item { Layout.fillWidth: true }
                             Text {
                                 text: Math.round(backend.minTemperature) + "°C – " + Math.round(backend.maxTemperature) + "°C"
-                                color: theme.accent
-                                font.pixelSize: 12
+                                color: accentColor
+                                font.family: settingsWin.font.family
+                                font.pixelSize: Math.round(12 * settingsWin.textScale)
                                 font.bold: true
                             }
                         }
                         Text {
                             text: qsTr("Adjust minimum (blue) and maximum (red) threshold bounds.")
-                            color: "#8b949e"
-                            font.pixelSize: 11
+                            color: mutedColor
+                            font.family: settingsWin.font.family
+                            font.pixelSize: Math.round(11 * settingsWin.textScale)
                         }
                     }
                 }
@@ -391,21 +451,24 @@ ApplicationWindow {
                 spacing: 6
                 Text {
                     text: qsTr("About Thermo")
-                    color: "#f0f6fc"
-                    font.pixelSize: 14
+                    color: textColor
+                    font.family: settingsWin.font.family
+                    font.pixelSize: Math.round(14 * settingsWin.textScale)
                     font.bold: true
                 }
                 Text {
                     text: qsTr("Created by Kairos Medical Informatics Ltd")
-                    color: "#c9d1d9"
-                    font.pixelSize: 12
+                    color: textColor
+                    font.family: settingsWin.font.family
+                    font.pixelSize: Math.round(12 * settingsWin.textScale)
                     wrapMode: Text.WordWrap
                     Layout.fillWidth: true
                 }
                 Text {
                     text: qsTr("Version %1 • MIT licence").arg(Qt.application.version)
-                    color: "#8b949e"
-                    font.pixelSize: 12
+                    color: mutedColor
+                    font.family: settingsWin.font.family
+                    font.pixelSize: Math.round(12 * settingsWin.textScale)
                 }
                 Button {
                     text: qsTr("Project and contributions on GitHub")
@@ -420,7 +483,7 @@ ApplicationWindow {
 
                 Button {
                     text: qsTr("Quit Thermo")
-                    Material.background: "#21262d"
+                    Material.background: panelColor
                     onClicked: backend.quitApp()
                 }
 

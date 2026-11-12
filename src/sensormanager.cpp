@@ -246,7 +246,22 @@ QVariantList SensorManager::readFanSpeeds(const QString &hwmonRoot) {
             int rpm = -1;
             if (inputFile.open(QIODevice::ReadOnly))
                 rpm = QString::fromUtf8(inputFile.readAll()).trimmed().toInt(&ok);
-            fans.append(QVariantMap{{"label", label}, {"rpm", ok && rpm >= 0 ? rpm : -1}});
+            QFile faultFile(device.filePath(base + "_fault"));
+            if (faultFile.exists()) {
+                bool validFault = false;
+                if (faultFile.open(QIODevice::ReadOnly)) {
+                    const int fault = QString::fromUtf8(faultFile.readAll()).trimmed().toInt(&validFault);
+                    if (fault != 0) validFault = false;
+                }
+                ok = ok && validFault;
+            }
+            QFile maxFile(device.filePath(base + "_max"));
+            bool maxOk = false;
+            int maximum = -1;
+            if (maxFile.open(QIODevice::ReadOnly))
+                maximum = QString::fromUtf8(maxFile.readAll()).trimmed().toInt(&maxOk);
+            fans.append(QVariantMap{{"label", label}, {"rpm", ok && rpm >= 0 ? rpm : -1},
+                                    {"maxRpm", maxOk && maximum > 0 ? maximum : -1}});
         }
     }
     return fans;

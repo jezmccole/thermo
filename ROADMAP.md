@@ -18,7 +18,11 @@ Completion: documentation matches the current code and scripts; About is readabl
 
 Completion: fixture-based tests cover failures and recovery; the interface never presents an invented value as a live measurement. Specify any JSON compatibility changes before implementation.
 
-## 3. Full Omarchy theme integration — next
+## Companion fan rail — added alongside milestone 2
+
+Optional blue-only fan-speed rail, tightly attached to the temperature rail. Uses the first detected fan and its hardware-reported maximum RPM. Disabled by default; unavailable data is flagged. Both rails share hover and vertical movement.
+
+## 3. Full Omarchy theme integration — delivered
 
 - Follow background, foreground, muted text, accents, borders, typography, and compatible style tokens.
 - Apply theme changes live and provide a Classic Glass appearance option.
@@ -26,7 +30,7 @@ Completion: fixture-based tests cover failures and recovery; the interface never
 
 Completion: verify light and dark themes, low-contrast palettes, missing files, and live theme replacement. Hover geometry remains stable and existing preferences are preserved.
 
-## 4. Polished public release — planned
+## 4. Polished public release — next
 
 - Validate dependencies, installation, upgrades, autostart, and uninstall on a clean supported environment.
 - Publish a versioned release with a reproducible Arch package and clear compatibility information; consider AUR publication after packaging is ready.

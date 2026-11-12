@@ -11,9 +11,10 @@ A quiet desktop thermometer for Omarchy: glance at the rail, hover for a readabl
 - A stationary desktop-edge rail with a blue → neutral → orange → red temperature scale and blue outlines.
 - A smoked glass badge that stays open while hovering the rail, connecting gap, or badge.
 - Live hardware temperature and fan RPM, refreshed every 1.5 seconds.
+- Optional blue companion fan rail, sharing the temperature rail’s position and hover interaction. Enable it in Settings. It shows the first detected fan’s RPM relative to its reported maximum; missing readings or maximums are flagged rather than guessed.
 - Click to open Settings; drag vertically to reposition. Default rail height: 127 pixels.
 - Apple SMC and CPU temperature detection, with a selectable sensor and Celsius/Fahrenheit display.
-- Optional login autostart. Settings follows the Omarchy accent and window rounding; full theme matching is planned.
+- Optional login autostart. Follow Omarchy appearance adapts badge and Settings colours, readable text, borders, font size/family, and window rounding live. Classic Glass retains the original smoked glass palette.
 
 The rail lives behind application windows. It may be covered by them; it is intended as an ambient desktop display.
 
@@ -83,9 +84,9 @@ The default sensor is Central Processor Proximity (`TC0P`) when available, then 
 - **Missing fan speed:** some hardware exposes no readable `fan*_input` entries. Missing or invalid fan readings are shown as unavailable; 0 RPM is a valid stopped-fan reading.
 - **Sensor warning:** the rail turns amber and loses its temperature fill when the selected sensor is missing or faulty. The badge and Settings explicitly flag the problem. A real previous reading remains marked stale (`*` in the badge); Settings shows its last successful UTC timestamp. If there has been no valid reading, the display says Unavailable. Recovery is detected automatically on the next successful poll; switching sensors clears the previous sensor’s reading. Fault flags, malformed/non-finite readings, and values outside −20°C to 140°C are rejected. These are validity bounds, not hardware safety limits.
 - **Unexpected temperature:** verify the selected sensor against the kernel's hwmon readings. CPU/system averages use fresh valid contributors on every poll and are unavailable when none are usable. Thermo is not a hardware safety alarm.
-- **Theme does not fully match:** only Settings accent and rounding currently follow Omarchy; the glass badge uses its own palette.
+- **Theme matching:** choose Follow Omarchy or Classic Glass in Settings. Follow Omarchy reads `colors.toml` and supported scalar tokens from `shell.toml`, including popup background/text/border and font base size; fontconfig supplies the system font family. Borders expressed as gradients use their first colour stop. Missing or low-contrast tokens receive readable fallbacks. Font size is bounded to keep the compact badge usable; thermal colours remain blue-to-red and the fan rail blue.
 - **Multiple installed copies:** `command -v thermo` shows which executable is used. A manually installed `~/.local/bin/thermo` may override the packaged `/usr/bin/thermo`.
-- Monitor selection, left-edge placement, full theme integration, and temperature history remain planned features.
+- Monitor selection, left-edge placement, and temperature history remain planned features.
 
 ## Uninstall
 

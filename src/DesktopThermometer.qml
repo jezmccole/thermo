@@ -4,6 +4,13 @@ import org.kde.layershell as LayerShell
 
 Window {
     id: thermoWindow
+    property bool followTheme: backend.appearanceMode === "omarchy"
+    property real textScale: followTheme ? theme.tokens.baseSize / 12 : 1
+    property color textColor: followTheme ? theme.tokens.foreground : "#f8fafc"
+    property color mutedColor: followTheme ? theme.tokens.muted : "#94a3b8"
+    property color warningColor: followTheme && theme.tokens.light ? "#92400e" : "#fbbf24"
+    property color chromeColor: followTheme ? theme.tokens.border : "#38bdf8"
+    property string textFamily: followTheme ? theme.tokens.fontFamily : Qt.application.font.family
     visible: true
     color: "transparent"
     flags: Qt.FramelessWindowHint
@@ -63,7 +70,7 @@ Window {
             anchors.fill: parent
             radius: width / 2
             color: "#d0141720"
-            border.color: backend.temperatureStatus === "live" ? Qt.rgba(backend.coldColor.r, backend.coldColor.g, backend.coldColor.b, 0.45) : "#fbbf24"
+            border.color: backend.temperatureStatus === "live" ? Qt.rgba(thermoWindow.chromeColor.r, thermoWindow.chromeColor.g, thermoWindow.chromeColor.b, 0.45) : thermoWindow.warningColor
             border.width: 1
 
             // Liquid temperature column filling from bottom
@@ -93,7 +100,7 @@ Window {
                         orientation: Gradient.Vertical
                         GradientStop { position: 0.00; color: "#dc2626" } // Crimson Red (hot)
                         GradientStop { position: 0.28; color: "#ea580c" } // Hot orange
-                        GradientStop { position: 0.55; color: "#94a3b8" } // Neutral midpoint
+                        GradientStop { position: 0.55; color: thermoWindow.mutedColor } // Neutral midpoint
                         GradientStop { position: 1.00; color: "#38bdf8" } // Arctic Cold Blue
                     }
                 }
@@ -114,6 +121,34 @@ Window {
                         NumberAnimation { to: 1.00; duration: 2400; easing.type: Easing.InOutSine }
                     }
                 }
+            }
+        }
+
+        // Optional companion fan rail. Shares the rail's position and input area.
+        Rectangle {
+            objectName: "fanRail"
+            visible: backend.fanRailEnabled
+            x: -10
+            width: 6
+            height: parent.height
+            radius: 3
+            color: "#d0141720"
+            border.width: 1
+            border.color: backend.fanLevelAvailable ? "#38bdf8" : thermoWindow.warningColor
+            Rectangle {
+                objectName: "fanFill"
+                visible: backend.fanLevelAvailable
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: parent.height * backend.fanLevel
+                radius: 3
+                gradient: Gradient {
+                    GradientStop { position: 0; color: "#bae6fd" }
+                    GradientStop { position: 0.5; color: "#38bdf8" }
+                    GradientStop { position: 1; color: "#1e3a8a" }
+                }
+                Behavior on height { NumberAnimation { duration: 650; easing.type: Easing.OutCubic } }
             }
         }
 
@@ -138,21 +173,21 @@ Window {
             // Frosted glass card backdrop with ice cold blue outline
             Rectangle {
                 anchors.fill: parent
-                radius: 12
+                radius: thermoWindow.followTheme ? Math.min(24, theme.radius) : 12
                 // Neutral smoked glass: a bright upper bevel over a dense base.
                 gradient: Gradient {
-                    GradientStop { position: 0; color: "#f2596069" }
-                    GradientStop { position: 0.32; color: "#f0353b43" }
-                    GradientStop { position: 1; color: "#f21c2128" }
+                    GradientStop { position: 0; color: thermoWindow.followTheme ? Qt.lighter(theme.tokens.background, 1.4) : "#f2596069" }
+                    GradientStop { position: 0.32; color: thermoWindow.followTheme ? theme.tokens.background : "#f0353b43" }
+                    GradientStop { position: 1; color: thermoWindow.followTheme ? Qt.darker(theme.tokens.background, 1.1) : "#f21c2128" }
                 }
 
                 Rectangle {
                     anchors.fill: parent
                     anchors.margins: 2
-                    radius: 10
+                    radius: thermoWindow.followTheme ? Math.max(0, Math.min(24, theme.radius) - 2) : 10
                     color: "transparent"
                     border.width: 1
-                    border.color: "#35ffffff"
+                    border.color: thermoWindow.followTheme && theme.tokens.light ? "#25000000" : "#35ffffff"
                 }
                 Rectangle {
                     anchors.top: parent.top
@@ -160,9 +195,9 @@ Window {
                     anchors.horizontalCenter: parent.horizontalCenter
                     width: parent.width - 28
                     height: 1
-                    color: "#75ffffff"
+                    color: thermoWindow.followTheme && theme.tokens.light ? "#35000000" : "#75ffffff"
                 }
-                border.color: Qt.rgba(backend.coldColor.r, backend.coldColor.g, backend.coldColor.b, 0.45)
+                border.color: Qt.rgba(thermoWindow.chromeColor.r, thermoWindow.chromeColor.g, thermoWindow.chromeColor.b, 0.45)
                 border.width: 1
 
                 // Subtle ambient glow shadow behind the card matching current temperature
@@ -183,7 +218,7 @@ Window {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 12
                 height: 1
-                color: Qt.rgba(backend.coldColor.r, backend.coldColor.g, backend.coldColor.b, 0.55)
+                color: Qt.rgba(thermoWindow.chromeColor.r, thermoWindow.chromeColor.g, thermoWindow.chromeColor.b, 0.55)
             }
 
             Column {
@@ -217,8 +252,9 @@ Window {
                     // Bold numerical temperature readout
                     Text {
                         text: backend.formattedTemperature + (backend.temperatureStatus === "stale" ? " *" : "")
-                        color: "#f8fafc"
-                        font.pixelSize: 16
+                        color: thermoWindow.textColor
+                        font.family: thermoWindow.textFamily
+                    font.pixelSize: Math.round(16 * thermoWindow.textScale)
                         font.weight: Font.DemiBold
                         anchors.verticalCenter: parent.verticalCenter
                     }
@@ -230,8 +266,9 @@ Window {
                     width: 224
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignHCenter
-                    color: "#fbbf24"
-                    font.pixelSize: 11
+                    color: thermoWindow.warningColor
+                    font.family: thermoWindow.textFamily
+                    font.pixelSize: Math.round(11 * thermoWindow.textScale)
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
 
@@ -240,8 +277,9 @@ Window {
                     text: backend.sensorLabel
                     width: 224
                     horizontalAlignment: Text.AlignHCenter
-                    color: "#94a3b8"
-                    font.pixelSize: 10
+                    color: thermoWindow.mutedColor
+                    font.family: thermoWindow.textFamily
+                    font.pixelSize: Math.round(10 * thermoWindow.textScale)
                     font.weight: Font.Medium
                     anchors.horizontalCenter: parent.horizontalCenter
                     elide: Text.ElideRight
@@ -256,8 +294,9 @@ Window {
                         horizontalAlignment: Text.AlignHCenter
                         elide: Text.ElideRight
                         text: modelData.label + ": " + (modelData.rpm < 0 ? qsTr("Unavailable") : modelData.rpm + " RPM")
-                        color: "#e2e8f0"
-                        font.pixelSize: 11
+                        color: thermoWindow.textColor
+                        font.family: thermoWindow.textFamily
+                    font.pixelSize: Math.round(11 * thermoWindow.textScale)
                         font.features: { "tnum": 1 }
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
@@ -265,16 +304,33 @@ Window {
                 Text {
                     visible: backend.fanSpeeds.length === 0
                     text: qsTr("Fan speed unavailable")
-                    color: "#cbd5e1"
-                    font.pixelSize: 11
+                    color: thermoWindow.mutedColor
+                    font.family: thermoWindow.textFamily
+                    font.pixelSize: Math.round(11 * thermoWindow.textScale)
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+
+                Text {
+                    visible: backend.fanRailEnabled && !backend.fanLevelAvailable
+                    text: backend.fanRailDescription
+                    width: 224
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    color: thermoWindow.warningColor
+                    font.family: thermoWindow.textFamily
+                    font.pixelSize: Math.round(10 * thermoWindow.textScale)
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
 
                 // Hint for user in cold blue accent
                 Text {
+                    width: 224
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignHCenter
                     text: isDragging ? qsTr("Moving position...") : qsTr("Drag to move • Click for settings")
-                    color: Qt.rgba(backend.coldColor.r, backend.coldColor.g, backend.coldColor.b, 0.7)
-                    font.pixelSize: 9
+                    color: Qt.rgba(thermoWindow.chromeColor.r, thermoWindow.chromeColor.g, thermoWindow.chromeColor.b, 0.7)
+                    font.family: thermoWindow.textFamily
+                    font.pixelSize: Math.round(9 * thermoWindow.textScale)
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
             }

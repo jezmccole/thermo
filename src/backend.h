@@ -32,6 +32,11 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantList fanSpeeds READ fanSpeeds NOTIFY fanSpeedsChanged)
     Q_PROPERTY(int sensorCount READ sensorCount NOTIFY sensorsUpdated)
 
+    Q_PROPERTY(QString appearanceMode READ appearanceMode NOTIFY appearanceChanged)
+    Q_PROPERTY(bool fanRailEnabled READ fanRailEnabled NOTIFY appearanceChanged)
+    Q_PROPERTY(double fanLevel READ fanLevel NOTIFY fanSpeedsChanged)
+    Q_PROPERTY(bool fanLevelAvailable READ fanLevelAvailable NOTIFY fanSpeedsChanged)
+    Q_PROPERTY(QString fanRailDescription READ fanRailDescription NOTIFY fanSpeedsChanged)
     Q_PROPERTY(bool autostart READ autostart NOTIFY autostartChanged)
     Q_PROPERTY(QString unit READ unit NOTIFY unitChanged)
     Q_PROPERTY(int idleWidth READ idleWidth NOTIFY appearanceChanged)
@@ -64,6 +69,11 @@ public:
     QVariantList fanSpeeds() const { return m_fanSpeeds; }
     int sensorCount() const { return m_sensors.size(); }
 
+    QString appearanceMode() const { return m_appearanceMode; }
+    bool fanRailEnabled() const { return m_fanRailEnabled; }
+    double fanLevel() const;
+    bool fanLevelAvailable() const;
+    QString fanRailDescription() const;
     bool autostart() const { return m_autostart; }
     QString unit() const { return m_unit; }
     int idleWidth() const { return m_idleWidth; }
@@ -76,6 +86,8 @@ public:
 
     // Invokable actions from QML
     Q_INVOKABLE void setSensorId(const QString &id);
+    Q_INVOKABLE void setAppearanceMode(const QString &mode);
+    Q_INVOKABLE void setFanRailEnabled(bool enabled);
     Q_INVOKABLE void setAutostart(bool enabled);
     Q_INVOKABLE void setUnit(const QString &unit);
     Q_INVOKABLE void setRailY(int y);
@@ -124,6 +136,8 @@ private:
     double m_minTemp = 30.0;
     double m_maxTemp = 100.0;
 
+    QString m_appearanceMode = "omarchy";
+    bool m_fanRailEnabled = false;
     bool m_autostart = true;
     QString m_unit = "C";
     int m_idleWidth = 6;
