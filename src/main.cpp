@@ -76,13 +76,14 @@ int main(int argc, char *argv[]) {
     if (clientSocket.waitForConnected(250)) {
         if (action == "quit") {
             clientSocket.write("QUIT\n");
-            clientSocket.flush();
-            clientSocket.waitForBytesWritten(500);
-            return 0;
+        } else if (action == "close") {
+            clientSocket.write("CLOSE_SETTINGS\n");
+        } else if (action == "toggle") {
+            clientSocket.write("TOGGLE_SETTINGS\n");
+        } else {
+            // Send show settings to existing instance
+            clientSocket.write("SHOW_SETTINGS\n");
         }
-
-        // Send show settings to existing instance
-        clientSocket.write("SHOW_SETTINGS\n");
         clientSocket.flush();
         clientSocket.waitForBytesWritten(500);
         return 0;
@@ -112,6 +113,13 @@ int main(int argc, char *argv[]) {
                 const QString msg = QString::fromUtf8(client->readAll()).trimmed();
                 if (msg == "SHOW_SETTINGS") {
                     backend.openSettings();
+                } else if (msg == "CLOSE_SETTINGS") {
+                    backend.closeSettings();
+                } else if (msg == "TOGGLE_SETTINGS") {
+                    if (backend.settingsVisible())
+                        backend.closeSettings();
+                    else
+                        backend.openSettings();
                 } else if (msg == "QUIT") {
                     backend.quitApp();
                 }
