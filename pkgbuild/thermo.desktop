@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Thermo
+Name[da]=Termometer
+Comment=Modern ambient desktop edge thermometer for MacBook
+Comment[da]=Moderne baggrundstermometer til MacBook
+Exec=thermo %f
+Icon=thermo
+Terminal=false
+Categories=Utility;System;
+StartupWMClass=thermo

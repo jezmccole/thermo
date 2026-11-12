@@ -1,0 +1,19 @@
+{
+  "Thermo": "Thermo",
+  "Thermo — Settings": "Thermo — Settings",
+  "Monitored Thermometer": "Monitored Thermometer",
+  "Select which MacBook hardware sensor to display. Default is Central Processor Proximity (TC0P).": "Select which MacBook hardware sensor to display. Default is Central Processor Proximity (TC0P).",
+  "Refresh": "Refresh",
+  "Launch on Startup": "Launch on Startup",
+  "Start Thermo automatically in the background when your operating system loads.": "Start Thermo automatically in the background when your operating system loads.",
+  "Display & Behavior": "Display & Behavior",
+  "Temperature Unit:": "Temperature Unit:",
+  "Resting Width:": "Resting Width:",
+  "Thermometer Height:": "Thermometer Height:",
+  "Temperature Scale Range:": "Temperature Scale Range:",
+  "Adjust minimum (green) and maximum (red) threshold bounds.": "Adjust minimum (green) and maximum (red) threshold bounds.",
+  "Close": "Close",
+  "Quit Thermo": "Quit Thermo",
+  "Moving position...": "Moving position...",
+  "Drag to move • Click for settings": "Drag to move • Click for settings"
+}
