@@ -24,6 +24,16 @@ Developed and verified on an **Intel MacBook running Omarchy and Hyprland on Way
 
 Temperature and fan availability depends on the kernel's hwmon drivers. Apple SMC (`applesmc`) and CPU (`coretemp`) sensors are detected; other hwmon temperature sensors may also appear. No fan-control functionality is provided.
 
+## Install a prebuilt package (Arch Linux / Omarchy, x86_64)
+
+```bash
+sudo pacman -S --needed qt6-base qt6-declarative qt6-wayland layer-shell-qt
+curl -LO https://github.com/jezmccole/thermo/releases/download/v0.1.0/thermo-0.1.0-1-x86_64.pkg.tar.zst
+sudo pacman -U thermo-0.1.0-1-x86_64.pkg.tar.zst
+```
+
+See the [releases page](https://github.com/jezmccole/thermo/releases) for other versions. An AUR package is planned; AUR registrations are currently paused upstream.
+
 ## Install from source on Omarchy / Arch Linux
 
 Install build and runtime dependencies:
@@ -42,7 +52,7 @@ cd thermo
 
 `bin/install` builds the application, creates an Arch package with `makepkg`, and invokes package installation, which may request your password. Build as your regular user.
 
-These instructions match the repository scripts; installation on a fresh machine has not yet been validated. There is no published AUR package or supported prebuilt release yet.
+These instructions match the repository scripts; installation on a fresh machine has not yet been validated. There is no published AUR package yet.
 
 To build without installing:
 
