@@ -1,23 +1,27 @@
+# Maintainer: Jez McCole <30532351+jezmccole@users.noreply.github.com>
 pkgname=thermo
 pkgver=0.1.0
-pkgrel=3
-pkgdesc='Modern ambient desktop edge thermometer for MacBook'
+pkgrel=1
+pkgdesc='Ambient desktop thermometer with live hardware temperatures and fan speeds for Omarchy'
 arch=('x86_64' 'aarch64')
+url='https://github.com/jezmccole/thermo'
 license=('MIT')
 depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'layer-shell-qt')
-makedepends=('gcc' 'make')
-source=()
-sha256sums=()
+source=("$pkgname-$pkgver.tar.gz::https://github.com/jezmccole/thermo/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('b5adae68a188074b4baab4a4fc03a7f26baae3b2dd659ef31c3e390c2c54e95f')
 
 build() {
-  cd "$startdir/.."
-  ./bin/build
+  cd "$pkgname-$pkgver"
+  mkdir -p build
+  cd build
+  qmake6 ..
+  make -j"$(nproc)"
 }
 
 package() {
-  cd "$startdir/.."
+  cd "$pkgname-$pkgver"
   install -Dm755 build/thermo "$pkgdir/usr/bin/thermo"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
-  install -Dm644 "$startdir/thermo.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/thermo.svg"
-  install -Dm644 "$startdir/thermo.desktop" "$pkgdir/usr/share/applications/thermo.desktop"
+  install -Dm644 pkgbuild/thermo.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/thermo.svg"
+  install -Dm644 pkgbuild/thermo.desktop "$pkgdir/usr/share/applications/thermo.desktop"
 }
